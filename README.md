@@ -6,6 +6,8 @@ UDP socket for data. It then parses that data and if it matches a certain
 format, it will plot the data in a graph, otherwise it will print the data to a
 text log for display.
 
+https://github.com/esp-cpp/wireless-debug-display/assets/213467/f835922f-e17f-4f76-95ee-5d6585e84656
+
 ## Configuration
 
 You'll need to configure the build using `idf.py set-target <esp32 or esp32s3>`
@@ -126,4 +128,23 @@ idf.py -p PORT flash monitor
 See the Getting Started Guide for full steps to configure and use ESP-IDF to build projects.
 
 ## Output
+
+### Console Logs:
+![initial output](https://github.com/esp-cpp/wireless-debug-display/assets/213467/c20993a7-9873-4c76-bc8e-1b115f63a5e0)
+![receiving more info](https://github.com/esp-cpp/wireless-debug-display/assets/213467/0413e79e-018c-497e-b9d7-511481d17385)
+
+### Python script:
+![python script](https://github.com/esp-cpp/wireless-debug-display/assets/213467/9d5d4899-3074-47b1-8d57-1ef22aa4bfba)
+
+### ESP32-WROVER-KIT
+
+https://github.com/esp-cpp/wireless-debug-display/assets/213467/395400f6-e677-464c-a258-df06049cc562
+
+### ESP32-S3-BOX
+
+![image](https://github.com/esp-cpp/wireless-debug-display/assets/213467/5aa28996-4ad7-4dbc-bc00-756ecd7ec736)
+![image](https://github.com/esp-cpp/wireless-debug-display/assets/213467/2c75f6dc-4528-4663-ae12-f894ec2bcdc9)
+![image](https://github.com/esp-cpp/wireless-debug-display/assets/213467/e59536a1-da8c-40fb-9f37-fdfdfb2d5b52)
+
+https://github.com/esp-cpp/wireless-debug-display/assets/213467/f835922f-e17f-4f76-95ee-5d6585e84656
 
