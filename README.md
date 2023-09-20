@@ -1,23 +1,101 @@
-# ESP++ Template
+# Wireless Debug Display
 
-Template repository for building an ESP app with ESP++ (espp) components and
-ESP-IDF components.
+This repository contains an example application designed for either
+ESP32-WROVER-KIT or ESP32-S3-BOX (selectable via menuconfig) which listens on a
+UDP socket for data. It then parses that data and if it matches a certain
+format, it will plot the data in a graph, otherwise it will print the data to a
+text log for display.
 
-## Development
+https://github.com/esp-cpp/wireless-debug-display/assets/213467/f835922f-e17f-4f76-95ee-5d6585e84656
 
-This repository is designed to be used as a template repository - so you can
-sepcify this as the template repository type when creating a new repository on
-GitHub.
+## Configuration
 
-After setting this as the template, make sure to update the following:
-- [This README](./README.md) to contain the relevant description and images of your project
-- The [./CMakeLists.txt](./CMakeLists.txt) file to have the components that you
-  want to use (and any you may have added to the [components
-  folder](./components)) as well as to update the project name
-- The [./main/main.cpp](./main/main.cpp) To run the main code for your app. The
-  [main folder](./main) is also where you can put additional header and source
-  files that you don't think belong in their own components but help keep the
-  main code clean.
+You'll need to configure the build using `idf.py set-target <esp32 or esp32s3>`
+and then `idf.py menuconfig` to then set the `Wireless Debug Display
+Configuration` which allows you to set which hardware you want to run it on, as
+well as the WiFi Access Point connection information (ssid/password). It also
+allows customization of the port of the UDP server that the debug display is
+running.
+
+## Use
+
+This code receives string data from a UDP server. It will parse that string data
+and determine which of the following three types of data it is:
+
+* *Commands*: contain the prefix (`+++`) in the string.
+* *Plot data*: contain the delimiter (`::`) in the string followed by a
+  single value which can be converted successfully to a number. If the
+  conversion fails, the message will be printed as a log.
+* *Log / text data*: all data that is not a command and cannot be
+  plotted.
+
+They are parsed in that priority order.
+
+Some example data (no commands) can be found in [test_data.txt](./test_data.txt).
+
+A couple python scripts are provided for sending data from a computer to your
+logger to showcase simple UDP socket sending, as well as automatic service
+discovery using mDNS.
+
+- [./send_to_display.py](./send_to_display.py): Uses simple UDP sockets to send
+  messages or a file to the debug display.
+- [./send_to_display_mdns.py](./send_to_display_mdns.py): Uses python's
+  `zeroconf` package to discover the wireless display on the network and then
+  send messages or a file to the debug display. NOTE: zeroconf may not be
+  installed / accessible within the python environment used by ESP-IDF.
+
+## Sending Data to the Display
+
+This display is designed to receive data from any other device on the network,
+though it is primarily intended for other embedded wireless devices such as
+other ESP-based systems. However, I have provided some scripts to help show how
+data can be sent from computers or other systems if you choose.
+
+Assuming that your computer is also on the network (you'll need to replace the
+IP address below with the ip address displayed in the `info` page of the
+display if you don't use the mDNS version):
+
+```console
+# this python script uses mDNS to automatically find the display on the network
+python ./send_to_display_mdns.py --file <file>
+python ./send_to_display_mdns.py --message "<message 1>" --message "<message 2>" ...
+# e.g.
+python ./send_to_display_mdns.py --file test_data.txt
+python ./send_to_display_mdns.py --message "Hello world" --message "trace1::0" --message "trace1::1" --message "Goodbye World"
+
+# this python script uses raw UDP sockets to send data to the display on the network
+python ./send_to_display.py --ip <IP Address> --port <port, default 5555> --file <file>
+python ./send_to_display.py --ip <IP Address> --port <port, default 5555> --message "<message 1>" --message "<message 2>" ... 
+# e.g.
+python ./send_to_display.py --ip 192.168.1.23 --file additional_data.txt
+python ./send_to_display.py --ip 192.168.1.23 --message "Hello world" --message "trace1::0" --message "trace1::1" --message "Goodbye World"
+```
+
+### Commands
+
+There are a limited set of commands in the system, which are
+determined by a prefix and the command itself. If the prefix is found
+_ANYWHERE_ in the string message (where messages are separated by
+newlines), then the message is determined to be a command.
+
+**PREFIX:** `+++` - three plus characters in a row
+
+* **Remove Plot:** this command (`RP:` followed by the string plot name) will remove the named plot from the graph.
+* **Clear Plots:** this command (`CP`) will remove _all_ plots from the graph.
+* **Clear Logs:** this command (`CL`) will remove _all_ logs / text.
+
+### Plotting
+
+Messages which contain the string `::` and which have a value that
+successfully and completely converts into a number are determined to
+be a plot. Plots are grouped by their name, which is any string
+preceding the `::`.
+
+### Logging
+
+All other text is treated as a log and written out to the log
+window. Note, we do not wrap lines, so any text that would go off the
+edge of the screen is simply not rendered.
 
 ## Cloning
 
@@ -51,6 +129,22 @@ See the Getting Started Guide for full steps to configure and use ESP-IDF to bui
 
 ## Output
 
-Example screenshot of the console output from this app:
+### Console Logs:
+![initial output](https://github.com/esp-cpp/wireless-debug-display/assets/213467/c20993a7-9873-4c76-bc8e-1b115f63a5e0)
+![receiving more info](https://github.com/esp-cpp/wireless-debug-display/assets/213467/0413e79e-018c-497e-b9d7-511481d17385)
 
-![CleanShot 2023-07-12 at 14 01 21](https://github.com/esp-cpp/template/assets/213467/7f8abeae-121b-4679-86d8-7214a76f1b75)
+### Python script:
+![python script](https://github.com/esp-cpp/wireless-debug-display/assets/213467/9d5d4899-3074-47b1-8d57-1ef22aa4bfba)
+
+### ESP32-WROVER-KIT
+
+https://github.com/esp-cpp/wireless-debug-display/assets/213467/395400f6-e677-464c-a258-df06049cc562
+
+### ESP32-S3-BOX
+
+![image](https://github.com/esp-cpp/wireless-debug-display/assets/213467/5aa28996-4ad7-4dbc-bc00-756ecd7ec736)
+![image](https://github.com/esp-cpp/wireless-debug-display/assets/213467/2c75f6dc-4528-4663-ae12-f894ec2bcdc9)
+![image](https://github.com/esp-cpp/wireless-debug-display/assets/213467/e59536a1-da8c-40fb-9f37-fdfdfb2d5b52)
+
+https://github.com/esp-cpp/wireless-debug-display/assets/213467/f835922f-e17f-4f76-95ee-5d6585e84656
+

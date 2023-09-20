@@ -8,17 +8,16 @@ include($ENV{IDF_PATH}/tools/cmake/project.cmake)
 set(EXTRA_COMPONENT_DIRS
   "components/"
   "components/espp/components/"
+  "components/esp-protocols/components"
 )
 
 set(
   COMPONENTS
-  # TODO: add additional esp-idf and espp components you want to use to the line below:
-  "main esptool_py logger task"
+  "main esptool_py driver lwip button display display_drivers input_drivers logger lvgl mdns socket task tt21100 wifi gui"
   CACHE STRING
   "List of components to include"
   )
 
-# TODO: update this with your project's name
-project(template)
+project(wireless-debug-display)
 
 set(CMAKE_CXX_STANDARD 20)

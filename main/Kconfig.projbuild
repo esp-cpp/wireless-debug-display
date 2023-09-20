@@ -1,0 +1,38 @@
+menu "Wireless Debug Display Configuration"
+
+    choice
+        prompt "Hardware Configuration"
+        default HARDWARE_BOX
+        help
+            Select the dev-kit / hardware you're using.
+        config HARDWARE_WROVER_KIT
+            bool "ESP32 WROVER KIT V4"
+        config HARDWARE_BOX
+            bool "ESP BOX"
+    endchoice
+
+    config DEBUG_SERVER_PORT
+        int "Debug Display Server Port"
+        default 5555
+        help
+            The port number of the wireless debug display's udp server
+
+    config ESP_WIFI_SSID
+        string "WiFi SSID"
+        default "myssid"
+        help
+            SSID (network name) for the camera streamer to connect to.
+
+    config ESP_WIFI_PASSWORD
+        string "WiFi Password"
+        default "mypassword"
+        help
+            WiFi password (WPA or WPA2) for the camera streamer to use.
+
+    config ESP_MAXIMUM_RETRY
+        int "Maximum retry"
+        default 5
+        help
+            Set the Maximum retry to avoid station reconnecting to the AP unlimited when the AP is really inexistent.
+
+endmenu
