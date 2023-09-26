@@ -65,9 +65,8 @@ public:
 
 protected:
   void init() {
+    /* NOTE: this doesn't seem to be needed
     using namespace std::chrono_literals;
-    /*
-    */
     // write 0x02 (software reset) to GT911 COMMAND register
     write(Registers::COMMAND, 0x02);
     // delay 200 ms
@@ -80,6 +79,7 @@ protected:
     write(Registers::SWITCH_1, val);
     // delay 200 ms
     std::this_thread::sleep_for(200ms);
+    */
   }
 
   static constexpr int CONTACT_SIZE = 8;
