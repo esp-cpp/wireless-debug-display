@@ -30,12 +30,13 @@ public:
   bool read() {
     static constexpr size_t DATA_LEN = CONTACT_SIZE * MAX_CONTACTS;
     static uint8_t data[DATA_LEN];
-    read(Registers::POINT_INFO, data, DATA_LEN);
+    read(Registers::POINT_INFO, data, 1);
     num_touch_points_ = data[0] & 0x0f;
     if (num_touch_points_ > 0) {
       logger_.debug("Got {} touch points", num_touch_points_);
+      read(Registers::POINTS, data, CONTACT_SIZE * num_touch_points_);
       // convert the data pointer to a GTPoint*
-      GTPoint* point = (GTPoint*)&data[1];
+      GTPoint* point = (GTPoint*)&data[0];
       x_ = point->x;
       y_ = point->y;
       logger_.debug("Touch at ({}, {})", x_, y_);

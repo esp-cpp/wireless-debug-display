@@ -218,6 +218,7 @@ extern "C" void app_main(void) {
   static constexpr std::string_view dev_kit = "ESP32-S3-BOX";
   gpio_num_t i2c_sda = GPIO_NUM_8;
   gpio_num_t i2c_scl = GPIO_NUM_18;
+  bool touch_swap_xy = false;
   int clock_speed = 60 * 1000 * 1000;
   auto spi_num = SPI2_HOST;
   gpio_num_t mosi = GPIO_NUM_6;
@@ -238,6 +239,7 @@ extern "C" void app_main(void) {
   static constexpr std::string_view dev_kit = "LILYGO T-DECK";
   gpio_num_t i2c_sda = GPIO_NUM_18;
   gpio_num_t i2c_scl = GPIO_NUM_8;
+  bool touch_swap_xy = true;
   int clock_speed = 40 * 1000 * 1000;
   auto spi_num = SPI2_HOST;
   gpio_num_t mosi = GPIO_NUM_41;
@@ -259,15 +261,6 @@ extern "C" void app_main(void) {
   gpio_num_t BOARD_POWER_ON_PIN = GPIO_NUM_10;
   gpio_set_direction(BOARD_POWER_ON_PIN, GPIO_MODE_OUTPUT);
   gpio_set_level(BOARD_POWER_ON_PIN, 1);
-
-  gpio_num_t TOUCH_INTERRUPT_PIN = GPIO_NUM_16;
-  // wake up the touch chip
-  gpio_set_direction(TOUCH_INTERRUPT_PIN, GPIO_MODE_OUTPUT);
-  gpio_set_level(TOUCH_INTERRUPT_PIN, 1);
-  std::this_thread::sleep_for(20ms);
-  // now set the interrupt as input
-  gpio_set_direction(TOUCH_INTERRUPT_PIN, GPIO_MODE_INPUT);
-  std::this_thread::sleep_for(20ms);
 
   gpio_num_t KEYBOARD_INTERRUPT_PIN = GPIO_NUM_46;
   gpio_set_direction(KEYBOARD_INTERRUPT_PIN, GPIO_MODE_INPUT);
@@ -392,9 +385,13 @@ extern "C" void app_main(void) {
 #endif
 #if CONFIG_HARDWARE_TDECK
   auto i2c_read = [&](uint8_t dev_addr, uint16_t reg_addr, uint8_t *data, size_t len) {
+    uint8_t reg_addr_data[] = {
+      (uint8_t)(reg_addr >> 8),
+      (uint8_t)(reg_addr & 0xff)
+    };
     auto err = i2c_master_write_read_device(I2C_PORT,
                                             dev_addr,
-                                            (uint8_t*)&reg_addr, 2,
+                                            reg_addr_data, 2,
                                             data, len,
                                             I2C_TIMEOUT_MS / portTICK_PERIOD_MS);
     if (err != ESP_OK) {
@@ -415,17 +412,14 @@ extern "C" void app_main(void) {
       .read = i2c_read,
       .write = i2c_write,
       .address = Gt911::DEFAULT_ADDRESS_1,
-      .log_level = espp::Logger::Verbosity::DEBUG
+      .log_level = espp::Logger::Verbosity::WARN
     });
 
   auto touchpad_read = [&](uint8_t* num_touch_points, uint16_t* x, uint16_t* y, uint8_t* btn_state) {
     *num_touch_points = 0;
     // get the latest data from the device
-    if (gpio_get_level(TOUCH_INTERRUPT_PIN)) {
-      logger.debug("touchpad interrupt");
-      if (gt911.read()) {
-        gt911.get_touch_point(num_touch_points, x, y);
-      }
+    if (gt911.read()) {
+      gt911.get_touch_point(num_touch_points, x, y);
     }
     // now hand it off
     *btn_state = false; // no touchscreen button on t-deck
@@ -435,7 +429,7 @@ extern "C" void app_main(void) {
   logger.info("Initializing touchpad");
   auto touchpad = espp::TouchpadInput(espp::TouchpadInput::Config{
       .touchpad_read = touchpad_read,
-      .swap_xy = false,
+      .swap_xy = touch_swap_xy,
       .invert_x = true,
       .invert_y = false,
       .log_level = espp::Logger::Verbosity::WARN
