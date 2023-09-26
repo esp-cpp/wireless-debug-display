@@ -13,7 +13,7 @@ set(EXTRA_COMPONENT_DIRS
 
 set(
   COMPONENTS
-  "main esptool_py driver lwip button display display_drivers input_drivers logger lvgl mdns socket task tt21100 wifi gui"
+  "main esptool_py driver lwip button display display_drivers input_drivers logger lvgl mdns socket task tt21100 gt911 wifi gui"
   CACHE STRING
   "List of components to include"
   )

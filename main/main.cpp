@@ -22,6 +22,12 @@ static constexpr int DC_PIN_NUM = 21;
 #include "touchpad_input.hpp"
 #include "tt21100.hpp"
 static constexpr int DC_PIN_NUM = 4;
+#elif CONFIG_HARDWARE_TDECK
+#include <driver/i2c.h>
+#include "st7789.hpp"
+#include "touchpad_input.hpp"
+#include "gt911.hpp"
+static constexpr int DC_PIN_NUM = 11;
 #else
 #error "Misconfigured hardware!"
 #endif
@@ -122,7 +128,7 @@ void IRAM_ATTR lcd_send_lines(int xs, int ys, int xe, int ye, const uint8_t *dat
 #if CONFIG_HARDWARE_WROVER_KIT
   trans[0].tx_data[0] = (uint8_t)espp::Ili9341::Command::caset;
 #endif
-#if CONFIG_HARDWARE_BOX
+#if CONFIG_HARDWARE_BOX || CONFIG_HARDWARE_TDECK
   trans[0].tx_data[0] = (uint8_t)espp::St7789::Command::caset;
 #endif
   trans[1].tx_data[0] = (xs) >> 8;
@@ -132,7 +138,7 @@ void IRAM_ATTR lcd_send_lines(int xs, int ys, int xe, int ye, const uint8_t *dat
 #if CONFIG_HARDWARE_WROVER_KIT
   trans[2].tx_data[0] = (uint8_t)espp::Ili9341::Command::raset;
 #endif
-#if CONFIG_HARDWARE_BOX
+#if CONFIG_HARDWARE_BOX || CONFIG_HARDWARE_TDECK
   trans[2].tx_data[0] = (uint8_t)espp::St7789::Command::raset;
 #endif
   trans[3].tx_data[0] = (ys) >> 8;
@@ -142,7 +148,7 @@ void IRAM_ATTR lcd_send_lines(int xs, int ys, int xe, int ye, const uint8_t *dat
 #if CONFIG_HARDWARE_WROVER_KIT
   trans[4].tx_data[0] = (uint8_t)espp::Ili9341::Command::ramwr;
 #endif
-#if CONFIG_HARDWARE_BOX
+#if CONFIG_HARDWARE_BOX || CONFIG_HARDWARE_TDECK
   trans[4].tx_data[0] = (uint8_t)espp::St7789::Command::ramwr;
 #endif
   trans[5].tx_buffer = data;
@@ -175,7 +181,7 @@ extern "C" void app_main(void) {
     return std::chrono::duration<float>(now - start).count();
   };
 
-  espp::Logger logger({.tag = "WirelessDebugDisplay", .level = espp::Logger::Verbosity::DEBUG});
+  espp::Logger logger({.tag = "WirelessDebugDisplay", .level = espp::Logger::Verbosity::INFO});
 
   logger.info("Bootup");
 
@@ -210,6 +216,9 @@ extern "C" void app_main(void) {
 #endif
 #if CONFIG_HARDWARE_BOX
   static constexpr std::string_view dev_kit = "ESP32-S3-BOX";
+  gpio_num_t i2c_sda = GPIO_NUM_8;
+  gpio_num_t i2c_scl = GPIO_NUM_18;
+  bool touch_swap_xy = false;
   int clock_speed = 60 * 1000 * 1000;
   auto spi_num = SPI2_HOST;
   gpio_num_t mosi = GPIO_NUM_6;
@@ -221,9 +230,40 @@ extern "C" void app_main(void) {
   size_t width = 320;
   size_t height = 240;
   size_t pixel_buffer_size = width * 50;
+  bool backlight_value = true;
   bool invert_colors = true;
   auto flush_cb = espp::St7789::flush;
   auto rotation = espp::Display::Rotation::LANDSCAPE;
+#endif
+#if CONFIG_HARDWARE_TDECK
+  static constexpr std::string_view dev_kit = "LILYGO T-DECK";
+  gpio_num_t i2c_sda = GPIO_NUM_18;
+  gpio_num_t i2c_scl = GPIO_NUM_8;
+  bool touch_swap_xy = true;
+  int clock_speed = 40 * 1000 * 1000;
+  auto spi_num = SPI2_HOST;
+  gpio_num_t mosi = GPIO_NUM_41;
+  gpio_num_t sclk = GPIO_NUM_40;
+  gpio_num_t spics = GPIO_NUM_12;
+  gpio_num_t reset = GPIO_NUM_NC; // not connected according to Setup210_LilyGo_T_Deck.h
+  gpio_num_t dc_pin = (gpio_num_t)DC_PIN_NUM;
+  gpio_num_t backlight = GPIO_NUM_42;
+  size_t width = 320;
+  size_t height = 240;
+  size_t pixel_buffer_size = width * 50;
+  bool backlight_value = true;
+  bool invert_colors = false;
+  auto flush_cb = espp::St7789::flush;
+  auto rotation = espp::Display::Rotation::LANDSCAPE_INVERTED;
+
+  // peripheral power on t-deck requires the power pin to be set (gpio 10)
+  // so set up gpio output and set it high
+  gpio_num_t BOARD_POWER_ON_PIN = GPIO_NUM_10;
+  gpio_set_direction(BOARD_POWER_ON_PIN, GPIO_MODE_OUTPUT);
+  gpio_set_level(BOARD_POWER_ON_PIN, 1);
+
+  gpio_num_t KEYBOARD_INTERRUPT_PIN = GPIO_NUM_46;
+  gpio_set_direction(KEYBOARD_INTERRUPT_PIN, GPIO_MODE_INPUT);
 #endif
 
   logger.info("Initializing display drivers for {}", dev_kit);
@@ -262,7 +302,7 @@ extern "C" void app_main(void) {
                                                             .backlight_pin = backlight,
                                                             .invert_colors = invert_colors});
 #endif
-#if CONFIG_HARDWARE_BOX
+#if CONFIG_HARDWARE_BOX || CONFIG_HARDWARE_TDECK
     // initialize the controller
     espp::St7789::initialize(espp::display_drivers::Config{
         .lcd_write = lcd_write,
@@ -270,8 +310,8 @@ extern "C" void app_main(void) {
         .reset_pin = reset,
         .data_command_pin = dc_pin,
         .backlight_pin = backlight,
-        .backlight_on_value = invert_colors,
-        .invert_colors = true,
+        .backlight_on_value = backlight_value,
+        .invert_colors = invert_colors,
         .mirror_x = true,
         .mirror_y = true,
     });
@@ -306,7 +346,7 @@ extern "C" void app_main(void) {
       .log_level = espp::Logger::Verbosity::WARN,
   });
 #endif
-#if CONFIG_HARDWARE_BOX
+#if CONFIG_HARDWARE_BOX || CONFIG_HARDWARE_TDECK
   // initialize the i2c bus to read the touchpad driver (tt21100)
   static constexpr auto I2C_PORT = I2C_NUM_0;
   static constexpr int I2C_FREQ_HZ = (400*1000);
@@ -314,8 +354,8 @@ extern "C" void app_main(void) {
   logger.info("initializing i2c driver...");
   i2c_config_t i2c_cfg;
   memset(&i2c_cfg, 0, sizeof(i2c_cfg));
-  i2c_cfg.sda_io_num = GPIO_NUM_8;
-  i2c_cfg.scl_io_num = GPIO_NUM_18;
+  i2c_cfg.sda_io_num = i2c_sda;
+  i2c_cfg.scl_io_num = i2c_scl;
   i2c_cfg.mode = I2C_MODE_MASTER;
   i2c_cfg.sda_pullup_en = GPIO_PULLUP_ENABLE;
   i2c_cfg.scl_pullup_en = GPIO_PULLUP_ENABLE;
@@ -325,6 +365,7 @@ extern "C" void app_main(void) {
   i2c_err = i2c_driver_install(I2C_PORT, I2C_MODE_MASTER,  0, 0, 0); // buff len (x2), default flags
   if (i2c_err != ESP_OK) logger.error("install i2c driver failed");
 
+#if CONFIG_HARDWARE_BOX
   auto i2c_read = [&](uint8_t dev_addr, uint8_t *data, size_t len) {
     i2c_master_read_from_device(I2C_PORT, dev_addr, data, len, I2C_TIMEOUT_MS / portTICK_PERIOD_MS);
   };
@@ -341,11 +382,54 @@ extern "C" void app_main(void) {
     tt21100.get_touch_point(num_touch_points, x, y);
     *btn_state = tt21100.get_home_button_state();
   };
+#endif
+#if CONFIG_HARDWARE_TDECK
+  auto i2c_read = [&](uint8_t dev_addr, uint16_t reg_addr, uint8_t *data, size_t len) {
+    uint8_t reg_addr_data[] = {
+      (uint8_t)(reg_addr >> 8),
+      (uint8_t)(reg_addr & 0xff)
+    };
+    auto err = i2c_master_write_read_device(I2C_PORT,
+                                            dev_addr,
+                                            reg_addr_data, 2,
+                                            data, len,
+                                            I2C_TIMEOUT_MS / portTICK_PERIOD_MS);
+    if (err != ESP_OK) {
+      logger.error("Could not write read device: {:#02x} at register: {:#02x}, error: {}",
+                   dev_addr, reg_addr, esp_err_to_name(err));
+    }
+  };
+  auto i2c_write = [&](uint8_t dev_addr, uint8_t *data, size_t len) {
+    auto err = i2c_master_write_to_device(I2C_PORT, dev_addr, data, len, I2C_TIMEOUT_MS / portTICK_PERIOD_MS);
+    if (err != ESP_OK) {
+      logger.error("Could not write to device: {:#02x} error: {}",
+                   dev_addr, esp_err_to_name(err));
+    }
+  };
+  logger.info("Initializing GT911");
+  // implement GT911
+  auto gt911 = Gt911(Gt911::Config{
+      .read = i2c_read,
+      .write = i2c_write,
+      .address = Gt911::DEFAULT_ADDRESS_1,
+      .log_level = espp::Logger::Verbosity::WARN
+    });
+
+  auto touchpad_read = [&](uint8_t* num_touch_points, uint16_t* x, uint16_t* y, uint8_t* btn_state) {
+    *num_touch_points = 0;
+    // get the latest data from the device
+    if (gt911.read()) {
+      gt911.get_touch_point(num_touch_points, x, y);
+    }
+    // now hand it off
+    *btn_state = false; // no touchscreen button on t-deck
+  };
+#endif
 
   logger.info("Initializing touchpad");
   auto touchpad = espp::TouchpadInput(espp::TouchpadInput::Config{
       .touchpad_read = touchpad_read,
-      .swap_xy = false,
+      .swap_xy = touch_swap_xy,
       .invert_x = true,
       .invert_y = false,
       .log_level = espp::Logger::Verbosity::WARN
