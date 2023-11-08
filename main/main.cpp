@@ -16,6 +16,8 @@
 #include "wrover_kit.hpp"
 #elif CONFIG_HARDWARE_BOX
 #include "box.hpp"
+#elif CONFIG_HARDWARE_BOX_3
+#include "box_3.hpp"
 #elif CONFIG_HARDWARE_TDECK
 #include "tdeck.hpp"
 #else
@@ -115,32 +117,17 @@ void IRAM_ATTR lcd_send_lines(int xs, int ys, int xe, int ye, const uint8_t *dat
     trans[i].flags = SPI_TRANS_USE_TXDATA;
   }
   size_t length = (xe - xs + 1) * (ye - ys + 1) * 2;
-#if CONFIG_HARDWARE_WROVER_KIT
-  trans[0].tx_data[0] = (uint8_t)espp::Ili9341::Command::caset;
-#endif
-#if CONFIG_HARDWARE_BOX || CONFIG_HARDWARE_TDECK
-  trans[0].tx_data[0] = (uint8_t)espp::St7789::Command::caset;
-#endif
+  trans[0].tx_data[0] = (uint8_t)DisplayDriver::Command::caset;
   trans[1].tx_data[0] = (xs) >> 8;
   trans[1].tx_data[1] = (xs)&0xff;
   trans[1].tx_data[2] = (xe) >> 8;
   trans[1].tx_data[3] = (xe)&0xff;
-#if CONFIG_HARDWARE_WROVER_KIT
-  trans[2].tx_data[0] = (uint8_t)espp::Ili9341::Command::raset;
-#endif
-#if CONFIG_HARDWARE_BOX || CONFIG_HARDWARE_TDECK
-  trans[2].tx_data[0] = (uint8_t)espp::St7789::Command::raset;
-#endif
+  trans[2].tx_data[0] = (uint8_t)DisplayDriver::Command::raset;
   trans[3].tx_data[0] = (ys) >> 8;
   trans[3].tx_data[1] = (ys)&0xff;
   trans[3].tx_data[2] = (ye) >> 8;
   trans[3].tx_data[3] = (ye)&0xff;
-#if CONFIG_HARDWARE_WROVER_KIT
-  trans[4].tx_data[0] = (uint8_t)espp::Ili9341::Command::ramwr;
-#endif
-#if CONFIG_HARDWARE_BOX || CONFIG_HARDWARE_TDECK
-  trans[4].tx_data[0] = (uint8_t)espp::St7789::Command::ramwr;
-#endif
+  trans[4].tx_data[0] = (uint8_t)DisplayDriver::Command::ramwr;
   trans[5].tx_buffer = data;
   trans[5].length = length * 8;
   // undo SPI_TRANS_USE_TXDATA flag
@@ -229,37 +216,25 @@ extern "C" void app_main(void) {
   // Attach the LCD to the SPI bus
   ret = spi_bus_add_device(spi_num, &devcfg, &spi);
   ESP_ERROR_CHECK(ret);
-#if CONFIG_HARDWARE_WROVER_KIT
-    // initialize the controller
-    espp::Ili9341::initialize(espp::display_drivers::Config{.lcd_write = lcd_write,
-                                                            .lcd_send_lines = lcd_send_lines,
-                                                            .reset_pin = reset,
-                                                            .data_command_pin = dc_pin,
-                                                            .backlight_pin = backlight,
-                                                            .invert_colors = invert_colors});
-#endif
-#if CONFIG_HARDWARE_BOX || CONFIG_HARDWARE_TDECK
-    // initialize the controller
-    espp::St7789::initialize(espp::display_drivers::Config{
-        .lcd_write = lcd_write,
-        .lcd_send_lines = lcd_send_lines,
-        .reset_pin = reset,
-        .data_command_pin = dc_pin,
-        .backlight_pin = backlight,
-        .backlight_on_value = backlight_value,
-        .invert_colors = invert_colors,
-        .mirror_x = true,
-        .mirror_y = true,
+  // initialize the controller
+  DisplayDriver::initialize(espp::display_drivers::Config{.lcd_write = lcd_write,
+                                                          .lcd_send_lines = lcd_send_lines,
+                                                          .reset_pin = reset,
+                                                          .data_command_pin = dc_pin,
+                                                          .backlight_pin = backlight,
+                                                          .backlight_on_value = backlight_value,
+                                                          .invert_colors = invert_colors,
+                                                          .mirror_x = mirror_x,
+                                                          .mirror_y = mirror_y,
     });
-#endif
-    // initialize the display / lvgl
-    auto display = std::make_shared<espp::Display>(
-                                                   espp::Display::AllocatingConfig{.width = width,
-                                                                                   .height = height,
-                                                                                   .pixel_buffer_size = pixel_buffer_size,
-                                                                                   .flush_callback = flush_cb,
-                                                                                   .rotation = rotation,
-                                                                                   .software_rotation_enabled = true});
+  // initialize the display / lvgl
+  auto display = std::make_shared<espp::Display>(
+                                                 espp::Display::AllocatingConfig{.width = width,
+                                                                                 .height = height,
+                                                                                 .pixel_buffer_size = pixel_buffer_size,
+                                                                                 .flush_callback = DisplayDriver::flush,
+                                                                                 .rotation = rotation,
+                                                                                 .software_rotation_enabled = true});
 
   // create the gui
   Gui gui({
@@ -282,8 +257,8 @@ extern "C" void app_main(void) {
       .log_level = espp::Logger::Verbosity::WARN,
   });
 #endif
-#if CONFIG_HARDWARE_BOX || CONFIG_HARDWARE_TDECK
-  // initialize the i2c bus to read the touchpad driver (tt21100)
+#if CONFIG_HARDWARE_BOX || CONFIG_HARDWARE_BOX_3 || CONFIG_HARDWARE_TDECK
+  // initialize the i2c bus to read the touchpad driver
   espp::I2c i2c({
       .port = I2C_NUM_0,
       .sda_io_num = i2c_sda,
@@ -293,46 +268,41 @@ extern "C" void app_main(void) {
       .clk_speed = 400 * 1000,
     });
 
-#if CONFIG_HARDWARE_BOX
+  // probe for the touch devices:
+  // tt21100, gt911
+  bool has_tt21100 = false;
+  bool has_gt911 = false;
+  has_tt21100 = i2c.probe_device(0x24);
+  has_gt911 = i2c.probe_device(0x5d) | i2c.probe_device(0x14);
+  logger.info("Touchpad probe results: tt21100: {}, gt911: {}", has_tt21100, has_gt911);
+
+#if CONFIG_HARDWARE_BOX || CONFIG_HARDWARE_BOX_3
   logger.info("Initializing Tt21100");
-  auto tt21100 = espp::Tt21100({
+  espp::Tt21100 touch({
       .read = std::bind(&espp::I2c::read, &i2c, std::placeholders::_1, std::placeholders::_2,
                         std::placeholders::_3),
     });
-  auto touchpad_read = [&](uint8_t* num_touch_points, uint16_t* x, uint16_t* y, uint8_t* btn_state) {
-    std::error_code ec;
-    // get the latest data from the device
-    tt21100.update(ec);
-    if (ec) {
-      logger.error("Could not update tt21100: {}", ec.message());
-      return;
-    }
-    // now hand it off
-    tt21100.get_touch_point(num_touch_points, x, y);
-    *btn_state = tt21100.get_home_button_state();
-  };
 #endif
 #if CONFIG_HARDWARE_TDECK
   logger.info("Initializing GT911");
   // implement GT911
-  espp::Gt911 gt911({.write = std::bind(&espp::I2c::write, &i2c, std::placeholders::_1,
+  espp::Gt911 touch({.write = std::bind(&espp::I2c::write, &i2c, std::placeholders::_1,
                                         std::placeholders::_2, std::placeholders::_3),
       .write_read = std::bind(&espp::I2c::write_read, &i2c, std::placeholders::_1,
                               std::placeholders::_2, std::placeholders::_3,
                               std::placeholders::_4, std::placeholders::_5)});
 
-  auto touchpad_read = [&](uint8_t* num_touch_points, uint16_t* x, uint16_t* y, uint8_t* btn_state) {
-    *num_touch_points = 0;
-    // get the latest data from the device
-    std::error_code ec;
-    if (gt911.update(ec) && !ec) {
-      gt911.get_touch_point(num_touch_points, x, y);
-    }
-    // now hand it off
-    *btn_state = false; // no touchscreen button on t-deck
-  };
 #endif
 
+  auto touchpad_read = [&touch](uint8_t* num_touch_points, uint16_t* x, uint16_t* y, uint8_t* btn_state) {
+    std::error_code ec;
+    *num_touch_points = 0;
+    // get the latest data from the device
+    if (touch.update(ec) && !ec) {
+      touch.get_touch_point(num_touch_points, x, y);
+    }
+    *btn_state = touch.get_home_button_state();
+  };
   logger.info("Initializing touchpad");
   auto touchpad = espp::TouchpadInput(espp::TouchpadInput::Config{
       .touchpad_read = touchpad_read,

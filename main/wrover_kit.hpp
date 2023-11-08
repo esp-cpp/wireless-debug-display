@@ -16,6 +16,10 @@ static constexpr gpio_num_t backlight = GPIO_NUM_5;
 static constexpr size_t width = 320;
 static constexpr size_t height = 240;
 static constexpr size_t pixel_buffer_size = 16384;
+static constexpr bool backlight_value = false;
 static constexpr bool invert_colors = false;
-static auto flush_cb = espp::Ili9341::flush;
 static auto rotation = espp::Display::Rotation::LANDSCAPE;
+static constexpr bool mirror_x = false;
+static constexpr bool mirror_y = false;
+
+using DisplayDriver = espp::Ili9341;
