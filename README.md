@@ -1,10 +1,10 @@
 # Wireless Debug Display
 
 This repository contains an example application designed for either
-ESP32-WROVER-KIT, ESP32-S3-BOX, or LILYGO T-DECK (selectable via menuconfig) which listens on a
-UDP socket for data. It then parses that data and if it matches a certain
-format, it will plot the data in a graph, otherwise it will print the data to a
-text log for display.
+ESP32-WROVER-KIT, ESP32-S3-BOX, ESP32-S3-BOX-3, or LILYGO T-DECK (selectable via
+menuconfig) which listens on a UDP socket for data. It then parses that data and
+if it matches a certain format, it will plot the data in a graph, otherwise it
+will print the data to a text log for display.
 
 https://github.com/esp-cpp/wireless-debug-display/assets/213467/f835922f-e17f-4f76-95ee-5d6585e84656
 
@@ -152,3 +152,7 @@ https://github.com/esp-cpp/wireless-debug-display/assets/213467/395400f6-e677-46
 
 https://github.com/esp-cpp/wireless-debug-display/assets/213467/f835922f-e17f-4f76-95ee-5d6585e84656
 
+### ESP32-S3-BOX-3
+
+![image](https://github.com/esp-cpp/wireless-debug-display/assets/213467/26501803-44bc-47a6-b229-d0b3ca1eb3be)
+![image](https://github.com/esp-cpp/wireless-debug-display/assets/213467/a1f34a60-dae2-4264-a85b-a8b28f9bbacf)

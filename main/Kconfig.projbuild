@@ -9,6 +9,8 @@ menu "Wireless Debug Display Configuration"
             bool "ESP32 WROVER KIT V4"
         config HARDWARE_BOX
             bool "ESP BOX"
+        config HARDWARE_BOX_3
+            bool "ESP BOX 3"
         config HARDWARE_TDECK
             bool "LILYGO T DECK"
     endchoice

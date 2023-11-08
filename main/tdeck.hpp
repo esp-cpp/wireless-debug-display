@@ -22,6 +22,12 @@ static constexpr size_t width = 320;
 static constexpr size_t height = 240;
 static constexpr size_t pixel_buffer_size = width * 50;
 static constexpr bool backlight_value = true;
+static constexpr bool reset_value = false;
 static constexpr bool invert_colors = false;
-static constexpr auto flush_cb = espp::St7789::flush;
 static constexpr auto rotation = espp::Display::Rotation::LANDSCAPE_INVERTED;
+static constexpr bool mirror_x = true;
+static constexpr bool mirror_y = true;
+static constexpr bool touch_invert_x = true;
+static constexpr bool touch_invert_y = false;
+
+using DisplayDriver = espp::St7789;
