@@ -17,6 +17,7 @@ static constexpr size_t width = 320;
 static constexpr size_t height = 240;
 static constexpr size_t pixel_buffer_size = 16384;
 static constexpr bool backlight_value = false;
+static constexpr bool reset_value = false;
 static constexpr bool invert_colors = false;
 static auto rotation = espp::Display::Rotation::LANDSCAPE;
 static constexpr bool mirror_x = false;

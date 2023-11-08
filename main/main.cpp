@@ -223,6 +223,7 @@ extern "C" void app_main(void) {
                                                           .data_command_pin = dc_pin,
                                                           .backlight_pin = backlight,
                                                           .backlight_on_value = backlight_value,
+                                                          .reset_value = reset_value,
                                                           .invert_colors = invert_colors,
                                                           .mirror_x = mirror_x,
                                                           .mirror_y = mirror_y,
@@ -276,14 +277,14 @@ extern "C" void app_main(void) {
   has_gt911 = i2c.probe_device(0x5d) | i2c.probe_device(0x14);
   logger.info("Touchpad probe results: tt21100: {}, gt911: {}", has_tt21100, has_gt911);
 
-#if CONFIG_HARDWARE_BOX || CONFIG_HARDWARE_BOX_3
+#if CONFIG_HARDWARE_BOX
   logger.info("Initializing Tt21100");
   espp::Tt21100 touch({
       .read = std::bind(&espp::I2c::read, &i2c, std::placeholders::_1, std::placeholders::_2,
                         std::placeholders::_3),
     });
 #endif
-#if CONFIG_HARDWARE_TDECK
+#if CONFIG_HARDWARE_TDECK || CONFIG_HARDWARE_BOX_3
   logger.info("Initializing GT911");
   // implement GT911
   espp::Gt911 touch({.write = std::bind(&espp::I2c::write, &i2c, std::placeholders::_1,
@@ -307,8 +308,8 @@ extern "C" void app_main(void) {
   auto touchpad = espp::TouchpadInput(espp::TouchpadInput::Config{
       .touchpad_read = touchpad_read,
       .swap_xy = touch_swap_xy,
-      .invert_x = true,
-      .invert_y = false,
+      .invert_x = touch_invert_x,
+      .invert_y = touch_invert_y,
       .log_level = espp::Logger::Verbosity::WARN
     });
 #endif
