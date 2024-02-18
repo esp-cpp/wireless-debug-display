@@ -9,14 +9,14 @@
 
 #include "converter.hpp"
 #include "display.hpp"
-#include "task.hpp"
-#include "logger.hpp"
-#include "text_window.hpp"
 #include "graph_window.hpp"
+#include "logger.hpp"
+#include "task.hpp"
+#include "text_window.hpp"
 
 class Gui {
 public:
-  const std::string delimeter_data = "::";       ///< Delimeter indicating this contains plottable data
+  const std::string delimeter_data = "::"; ///< Delimeter indicating this contains plottable data
   const std::string delimeter_command = "+++";   ///< Delimeter indicating this contains a command
   const std::string command_remove_plot = "RP:"; ///< Command: remove plot
   const std::string command_clear_plots = "CP";  ///< Command: clear plots
@@ -27,17 +27,15 @@ public:
     espp::Logger::Verbosity log_level{espp::Logger::Verbosity::WARN};
   };
 
-  explicit Gui(const Config& config)
-    : display_(config.display)
-    , logger_({.tag = "Gui", .level = config.log_level}) {
+  explicit Gui(const Config &config)
+      : display_(config.display)
+      , logger_({.tag = "Gui", .level = config.log_level}) {
     init_ui();
     // now start the gui updater task
     using namespace std::placeholders;
-    task_ = espp::Task::make_unique({
-        .name = "Gui Task",
-        .callback = std::bind(&Gui::update, this, _1, _2),
-        .stack_size_bytes = 6 * 1024
-      });
+    task_ = espp::Task::make_unique({.name = "Gui Task",
+                                     .callback = std::bind(&Gui::update, this, _1, _2),
+                                     .stack_size_bytes = 6 * 1024});
     task_->start();
   }
 
@@ -48,11 +46,11 @@ public:
 
   void switch_tab();
 
-  void push_data(const std::string& data);
+  void push_data(const std::string &data);
   std::string pop_data();
 
   void clear_info();
-  void add_info(const std::string& info);
+  void add_info(const std::string &info);
 
   bool handle_data();
 
@@ -60,7 +58,7 @@ protected:
   void init_ui();
   void deinit_ui();
 
-  bool update(std::mutex& m, std::condition_variable& cv) {
+  bool update(std::mutex &m, std::condition_variable &cv) {
     {
       std::lock_guard<std::recursive_mutex> lk(mutex_);
       lv_task_handler();
@@ -77,7 +75,7 @@ protected:
   static void event_callback(lv_event_t *e) {
     lv_event_code_t event_code = lv_event_get_code(e);
     auto user_data = lv_event_get_user_data(e);
-    auto gui = static_cast<Gui*>(user_data);
+    auto gui = static_cast<Gui *>(user_data);
     if (!gui) {
       return;
     }

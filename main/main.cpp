@@ -24,9 +24,9 @@
 #error "Misconfigured hardware!"
 #endif
 
+#include "gui.hpp"
 #include "logger.hpp"
 #include "task.hpp"
-#include "gui.hpp"
 #include "tcp_socket.hpp"
 #include "udp_socket.hpp"
 #include "wifi_sta.hpp"
@@ -217,40 +217,35 @@ extern "C" void app_main(void) {
   ret = spi_bus_add_device(spi_num, &devcfg, &spi);
   ESP_ERROR_CHECK(ret);
   // initialize the controller
-  DisplayDriver::initialize(espp::display_drivers::Config{.lcd_write = lcd_write,
-                                                          .lcd_send_lines = lcd_send_lines,
-                                                          .reset_pin = reset,
-                                                          .data_command_pin = dc_pin,
-                                                          .backlight_pin = backlight,
-                                                          .backlight_on_value = backlight_value,
-                                                          .reset_value = reset_value,
-                                                          .invert_colors = invert_colors,
-                                                          .mirror_x = mirror_x,
-                                                          .mirror_y = mirror_y,
-    });
+  DisplayDriver::initialize(espp::display_drivers::Config{
+      .lcd_write = lcd_write,
+      .lcd_send_lines = lcd_send_lines,
+      .reset_pin = reset,
+      .data_command_pin = dc_pin,
+      .reset_value = reset_value,
+      .invert_colors = invert_colors,
+      .mirror_x = mirror_x,
+      .mirror_y = mirror_y,
+  });
   // initialize the display / lvgl
   auto display = std::make_shared<espp::Display>(
-                                                 espp::Display::AllocatingConfig{.width = width,
-                                                                                 .height = height,
-                                                                                 .pixel_buffer_size = pixel_buffer_size,
-                                                                                 .flush_callback = DisplayDriver::flush,
-                                                                                 .rotation = rotation,
-                                                                                 .software_rotation_enabled = true});
+      espp::Display::AllocatingConfig{.width = width,
+                                      .height = height,
+                                      .pixel_buffer_size = pixel_buffer_size,
+                                      .flush_callback = DisplayDriver::flush,
+                                      .backlight_pin = backlight,
+                                      .backlight_on_value = backlight_value,
+                                      .rotation = rotation,
+                                      .software_rotation_enabled = true});
 
   // create the gui
-  Gui gui({
-      .display = display,
-      .log_level = espp::Logger::Verbosity::DEBUG
-    });
+  Gui gui({.display = display, .log_level = espp::Logger::Verbosity::DEBUG});
 
   // initialize the input system
 #if CONFIG_HARDWARE_WROVER_KIT
   espp::Button button({
       .gpio_num = GPIO_NUM_0,
-      .callback =
-          [&](const espp::Button::Event &event) {
-            gui.switch_tab();
-          },
+      .callback = [&](const espp::Button::Event &event) { gui.switch_tab(); },
       .active_level = espp::Button::ActiveLevel::LOW,
       .interrupt_type = espp::Button::InterruptType::RISING_EDGE,
       .pullup_enabled = false,
@@ -267,7 +262,7 @@ extern "C" void app_main(void) {
       .sda_pullup_en = GPIO_PULLUP_ENABLE,
       .scl_pullup_en = GPIO_PULLUP_ENABLE,
       .clk_speed = 400 * 1000,
-    });
+  });
 
   // probe for the touch devices:
   // tt21100, gt911
@@ -279,23 +274,20 @@ extern "C" void app_main(void) {
 
 #if CONFIG_HARDWARE_BOX
   logger.info("Initializing Tt21100");
-  espp::Tt21100 touch({
-      .read = std::bind(&espp::I2c::read, &i2c, std::placeholders::_1, std::placeholders::_2,
-                        std::placeholders::_3),
-    });
+  using TouchDriver = espp::Tt21100;
 #endif
 #if CONFIG_HARDWARE_TDECK || CONFIG_HARDWARE_BOX_3
   logger.info("Initializing GT911");
+  using TouchDriver = espp::Gt911;
   // implement GT911
-  espp::Gt911 touch({.write = std::bind(&espp::I2c::write, &i2c, std::placeholders::_1,
-                                        std::placeholders::_2, std::placeholders::_3),
-      .write_read = std::bind(&espp::I2c::write_read, &i2c, std::placeholders::_1,
-                              std::placeholders::_2, std::placeholders::_3,
-                              std::placeholders::_4, std::placeholders::_5)});
-
 #endif
+  TouchDriver touch({.write = std::bind(&espp::I2c::write, &i2c, std::placeholders::_1,
+                                        std::placeholders::_2, std::placeholders::_3),
+                     .read = std::bind(&espp::I2c::read, &i2c, std::placeholders::_1,
+                                       std::placeholders::_2, std::placeholders::_3)});
 
-  auto touchpad_read = [&touch](uint8_t* num_touch_points, uint16_t* x, uint16_t* y, uint8_t* btn_state) {
+  auto touchpad_read = [&touch](uint8_t *num_touch_points, uint16_t *x, uint16_t *y,
+                                uint8_t *btn_state) {
     std::error_code ec;
     *num_touch_points = 0;
     // get the latest data from the device
@@ -305,29 +297,27 @@ extern "C" void app_main(void) {
     *btn_state = touch.get_home_button_state();
   };
   logger.info("Initializing touchpad");
-  auto touchpad = espp::TouchpadInput(espp::TouchpadInput::Config{
-      .touchpad_read = touchpad_read,
-      .swap_xy = touch_swap_xy,
-      .invert_x = touch_invert_x,
-      .invert_y = touch_invert_y,
-      .log_level = espp::Logger::Verbosity::WARN
-    });
+  auto touchpad =
+      espp::TouchpadInput(espp::TouchpadInput::Config{.touchpad_read = touchpad_read,
+                                                      .swap_xy = touch_swap_xy,
+                                                      .invert_x = touch_invert_x,
+                                                      .invert_y = touch_invert_y,
+                                                      .log_level = espp::Logger::Verbosity::WARN});
 #endif
 
   // initialize WiFi
   logger.info("Initializing WiFi");
   std::string server_address;
-  espp::WifiSta wifi_sta({
-      .ssid = CONFIG_ESP_WIFI_SSID,
-        .password = CONFIG_ESP_WIFI_PASSWORD,
-        .num_connect_retries = CONFIG_ESP_MAXIMUM_RETRY,
-        .on_connected = nullptr,
-        .on_disconnected = nullptr,
-        .on_got_ip = [&server_address, &logger](ip_event_got_ip_t* eventdata) {
-          server_address = fmt::format("{}.{}.{}.{}", IP2STR(&eventdata->ip_info.ip));
-          logger.info("got IP: {}.{}.{}.{}", IP2STR(&eventdata->ip_info.ip));
-        }
-        });
+  espp::WifiSta wifi_sta({.ssid = CONFIG_ESP_WIFI_SSID,
+                          .password = CONFIG_ESP_WIFI_PASSWORD,
+                          .num_connect_retries = CONFIG_ESP_MAXIMUM_RETRY,
+                          .on_connected = nullptr,
+                          .on_disconnected = nullptr,
+                          .on_got_ip = [&server_address, &logger](ip_event_got_ip_t *eventdata) {
+                            server_address =
+                                fmt::format("{}.{}.{}.{}", IP2STR(&eventdata->ip_info.ip));
+                            logger.info("got IP: {}.{}.{}.{}", IP2STR(&eventdata->ip_info.ip));
+                          }});
 
   // wait for network
   while (!wifi_sta.is_connected()) {
@@ -341,67 +331,64 @@ extern "C" void app_main(void) {
   // create the socket
   espp::UdpSocket server_socket({.log_level = espp::Logger::Verbosity::WARN});
   auto server_task_config = espp::Task::Config{
-    .name = "UdpServer",
-    .callback = nullptr,
-    .stack_size_bytes = 6 * 1024,
+      .name = "UdpServer",
+      .callback = nullptr,
+      .stack_size_bytes = 6 * 1024,
   };
   auto server_config = espp::UdpSocket::ReceiveConfig{
-    .port = server_port,
-    .buffer_size = 1024,
-    .on_receive_callback =
-    [&gui](auto &data, auto &source) -> auto {
-      // turn the vector<uint8_t> into a string
-      std::string data_str(data.begin(), data.end());
-      fmt::print("Server received: '{}'\n"
-                 "    from source: {}\n",
-                 data_str, source);
-      gui.push_data(data_str);
-      gui.handle_data();
-      return std::nullopt;
-    }
-  };
-  server_socket.start_receiving(server_task_config, server_config);
+      .port = server_port,
+      .buffer_size = 1024,
+      .on_receive_callback = [&gui](
+          auto &data, auto &source) -> auto{// turn the vector<uint8_t> into a string
+                                            std::string data_str(data.begin(), data.end());
+  fmt::print("Server received: '{}'\n"
+             "    from source: {}\n",
+             data_str, source);
+  gui.push_data(data_str);
+  gui.handle_data();
+  return std::nullopt;
+}
+}
+;
+server_socket.start_receiving(server_task_config, server_config);
 
-  // initialize mDNS, so that other embedded devices on the network can find us
-  // without having to be hardcoded / configured with our IP address and port
-  logger.info("Initializing mDNS");
-  auto err = mdns_init();
-  if (err != ESP_OK) {
-    logger.error("Could not initialize mDNS: {}", err);
-    return;
-  }
+// initialize mDNS, so that other embedded devices on the network can find us
+// without having to be hardcoded / configured with our IP address and port
+logger.info("Initializing mDNS");
+auto err = mdns_init();
+if (err != ESP_OK) {
+  logger.error("Could not initialize mDNS: {}", err);
+  return;
+}
 
-  uint8_t mac[6];
-  esp_read_mac(mac, ESP_MAC_WIFI_STA);
-  std::string hostname = fmt::format("wireless-debug-display-{:x}{:x}{:x}", mac[3], mac[4], mac[5]);
-  err = mdns_hostname_set(hostname.c_str());
-  if (err != ESP_OK) {
-    logger.error("Could not set mDNS hostname: {}", err);
-    return;
-  }
-  logger.info("mDNS hostname set to '{}'", hostname);
-  err = mdns_instance_name_set("Wireless Debug Display");
-  if (err != ESP_OK) {
-    logger.error("Could not set mDNS instance name: {}", err);
-    return;
-  }
-  err = mdns_service_add("Wireless Debug Display", "_debugdisplay", "_udp", server_port, NULL, 0);
-  if (err != ESP_OK) {
-    logger.error("Could not add mDNS service: {}", err);
-    return;
-  }
-  logger.info("mDNS initialized");
+uint8_t mac[6];
+esp_read_mac(mac, ESP_MAC_WIFI_STA);
+std::string hostname = fmt::format("wireless-debug-display-{:x}{:x}{:x}", mac[3], mac[4], mac[5]);
+err = mdns_hostname_set(hostname.c_str());
+if (err != ESP_OK) {
+  logger.error("Could not set mDNS hostname: {}", err);
+  return;
+}
+logger.info("mDNS hostname set to '{}'", hostname);
+err = mdns_instance_name_set("Wireless Debug Display");
+if (err != ESP_OK) {
+  logger.error("Could not set mDNS instance name: {}", err);
+  return;
+}
+err = mdns_service_add("Wireless Debug Display", "_debugdisplay", "_udp", server_port, NULL, 0);
+if (err != ESP_OK) {
+  logger.error("Could not add mDNS service: {}", err);
+  return;
+}
+logger.info("mDNS initialized");
 
-  // update the info page
-  gui.clear_info();
-  gui.add_info(std::string("#FF0000 WiFi: #") +
-               CONFIG_ESP_WIFI_SSID);
-  gui.add_info(std::string("#00FF00 IP: #") +
-               server_address + ":" +
-               std::to_string(server_port));
+// update the info page
+gui.clear_info();
+gui.add_info(std::string("#FF0000 WiFi: #") + CONFIG_ESP_WIFI_SSID);
+gui.add_info(std::string("#00FF00 IP: #") + server_address + ":" + std::to_string(server_port));
 
-  // loop forever
-  while (true) {
-    std::this_thread::sleep_for(1s);
-  }
+// loop forever
+while (true) {
+  std::this_thread::sleep_for(1s);
+}
 }

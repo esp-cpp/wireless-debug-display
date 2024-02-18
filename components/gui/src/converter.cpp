@@ -2,7 +2,7 @@
 
 Converter::Status Converter::str2int(int &i, char const *s, int base) {
   char *end;
-  long  l;
+  long l;
   errno = 0;
   l = strtol(s, &end, base);
   if ((errno == ERANGE && l == LONG_MAX) || l > INT_MAX) {

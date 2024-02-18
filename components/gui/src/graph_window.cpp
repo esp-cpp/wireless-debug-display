@@ -16,7 +16,7 @@ void GraphWindow::init(lv_obj_t *parent, size_t width, size_t height) {
 
   // Show lines and points too
   lv_chart_set_type(chart_, LV_CHART_TYPE_LINE);
-  
+
   // update the tick values
   size_t major_tick_length = 5;
   size_t minor_tick_length = 2;
@@ -24,17 +24,12 @@ void GraphWindow::init(lv_obj_t *parent, size_t width, size_t height) {
   size_t minor_tick_count = 2;
   bool label_enabled = true;
   size_t draw_size = 50;
-  lv_chart_set_axis_tick(chart_, LV_CHART_AXIS_PRIMARY_Y,
-                         major_tick_length,
-                         minor_tick_length,
-                         major_tick_count,
-                         minor_tick_count,
-                         label_enabled,
-                         draw_size);
+  lv_chart_set_axis_tick(chart_, LV_CHART_AXIS_PRIMARY_Y, major_tick_length, minor_tick_length,
+                         major_tick_count, minor_tick_count, label_enabled, draw_size);
 
   // create the legend
   legend_ = lv_label_create(chart_);
-  lv_obj_align(legend_, LV_ALIGN_TOP_RIGHT, - 7, 5);
+  lv_obj_align(legend_, LV_ALIGN_TOP_RIGHT, -7, 5);
   lv_label_set_text(legend_, "");
 
   // create a style for the chart
@@ -50,14 +45,16 @@ void GraphWindow::init(lv_obj_t *parent, size_t width, size_t height) {
 void GraphWindow::update_ticks() {
 
   // get the minimum and maximum
-  lv_coord_t min=0, max=0;
+  lv_coord_t min = 0, max = 0;
   auto num_points = lv_chart_get_point_count(chart_);
   for (auto e : plot_map_) {
     auto series = e.second;
-    for (size_t i=0; i < num_points; i++) {
+    for (size_t i = 0; i < num_points; i++) {
       auto point = series->y_points[i];
-      if (point < min) min = point;
-      if (point > max) max = point;
+      if (point < min)
+        min = point;
+      if (point > max)
+        max = point;
     }
   }
 
@@ -73,7 +70,7 @@ void GraphWindow::update() {
   lv_chart_refresh(chart_);
 }
 
-void GraphWindow::clear_plots( void ) {
+void GraphWindow::clear_plots(void) {
   // remove all the series from the chart
   for (auto e : plot_map_) {
     lv_chart_remove_series(chart_, e.second);
@@ -84,16 +81,16 @@ void GraphWindow::clear_plots( void ) {
   lv_label_set_text(legend_, "");
 }
 
-void GraphWindow::add_data( const std::string& plotName, int newData ) {
-  auto plot = get_plot( plotName );
+void GraphWindow::add_data(const std::string &plotName, int newData) {
+  auto plot = get_plot(plotName);
   // couldn't find the plot so create a new one
-  if ( plot == nullptr )
-    plot = create_plot( plotName );
+  if (plot == nullptr)
+    plot = create_plot(plotName);
   // now add the data
   lv_chart_set_next_value(chart_, plot, newData);
 }
 
-lv_chart_series_t* GraphWindow::create_plot( const std::string& plotName ) {
+lv_chart_series_t *GraphWindow::create_plot(const std::string &plotName) {
   // make a random color
   uint8_t red = rand() % 256;
   uint8_t green = rand() % 256;
@@ -102,8 +99,8 @@ lv_chart_series_t* GraphWindow::create_plot( const std::string& plotName ) {
   // now make the plot
   auto plot = lv_chart_add_series(chart_, color, LV_CHART_AXIS_PRIMARY_Y);
 
-  //Add text to legend, #XXX <string># will be a colored string, if we set the
-  //recolor property to true on the label
+  // Add text to legend, #XXX <string># will be a colored string, if we set the
+  // recolor property to true on the label
   char label_buf[50];
   sprintf(label_buf, "#%02X%02X%02X - %s#\n", red, green, blue, plotName.c_str());
   char *current_legend = lv_label_get_text(legend_);
@@ -118,7 +115,7 @@ lv_chart_series_t* GraphWindow::create_plot( const std::string& plotName ) {
   return plot;
 }
 
-void GraphWindow::remove_plot( const std::string& plotName ) {
+void GraphWindow::remove_plot(const std::string &plotName) {
   auto plot = get_plot(plotName);
   if (plot != nullptr) {
     // we should remove it from the display
@@ -128,8 +125,8 @@ void GraphWindow::remove_plot( const std::string& plotName ) {
   }
 }
 
-lv_chart_series_t* GraphWindow::get_plot( const std::string& plotName ) {
-  lv_chart_series_t* plot = nullptr;
+lv_chart_series_t *GraphWindow::get_plot(const std::string &plotName) {
+  lv_chart_series_t *plot = nullptr;
   auto search = plot_map_.find(plotName);
   if (search != plot_map_.end()) {
     // set the plot to be the value of the element

@@ -1,9 +1,9 @@
 #pragma once
 
+#include "gt911.hpp"
 #include "i2c.hpp"
 #include "st7789.hpp"
 #include "touchpad_input.hpp"
-#include "gt911.hpp"
 static constexpr int DC_PIN_NUM = 11;
 
 static constexpr std::string_view dev_kit = "LILYGO T-DECK";
@@ -15,7 +15,8 @@ static constexpr auto spi_num = SPI2_HOST;
 static constexpr gpio_num_t mosi = GPIO_NUM_41;
 static constexpr gpio_num_t sclk = GPIO_NUM_40;
 static constexpr gpio_num_t spics = GPIO_NUM_12;
-static constexpr gpio_num_t reset = GPIO_NUM_NC; // not connected according to Setup210_LilyGo_T_Deck.h
+static constexpr gpio_num_t reset =
+    GPIO_NUM_NC; // not connected according to Setup210_LilyGo_T_Deck.h
 static constexpr gpio_num_t dc_pin = (gpio_num_t)DC_PIN_NUM;
 static constexpr gpio_num_t backlight = GPIO_NUM_42;
 static constexpr size_t width = 320;

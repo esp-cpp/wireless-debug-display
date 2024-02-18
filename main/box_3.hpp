@@ -1,10 +1,10 @@
 #pragma once
 
+#include "gt911.hpp"
 #include "i2c.hpp"
 #include "ili9341.hpp"
 #include "st7789.hpp"
 #include "touchpad_input.hpp"
-#include "gt911.hpp"
 #include "tt21100.hpp"
 static constexpr int DC_PIN_NUM = 4;
 
