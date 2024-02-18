@@ -8,6 +8,8 @@
 
 class GraphWindow : public Window {
 public:
+  GraphWindow() = default;
+
   void init(lv_obj_t *parent, size_t width, size_t height) override;
   void update() override;
 
@@ -22,8 +24,8 @@ protected:
   void update_ticks(void);
 
 private:
-  lv_obj_t *chart_;
-  lv_obj_t *legend_;
-  std::string y_ticks_;
-  std::unordered_map<std::string, lv_chart_series_t *> plot_map_;
+  lv_obj_t *chart_{nullptr};
+  lv_obj_t *legend_{nullptr};
+  std::string y_ticks_{""};
+  std::unordered_map<std::string, lv_chart_series_t *> plot_map_{};
 };

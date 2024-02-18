@@ -107,12 +107,11 @@ bool Gui::handle_data() {
         if ((pos = line.find(delimeter_data)) != std::string::npos) {
           // found "::" so we have a plot data
           std::string plotName;
-          std::string value;
           plotName = line.substr(0, pos);
           pos = pos + delimeter_data.length();
           if (pos < line.length()) {
             int iValue;
-            value = line.substr(pos, line.length());
+            auto value = line.substr(pos, line.length());
             if (Converter::str2int(iValue, value.c_str()) == Converter::Status::Success) {
               // make sure we transition to the next state
               plot_window_.add_data(plotName, iValue);
