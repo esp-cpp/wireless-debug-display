@@ -1,6 +1,6 @@
 #include "text_window.hpp"
 
-void TextWindow::init( lv_obj_t *parent, size_t width, size_t height ) {
+void TextWindow::init(lv_obj_t *parent, size_t width, size_t height) {
   Window::init(parent, width, height);
   log_container_ = lv_label_create(parent_);
   lv_label_set_recolor(log_container_, true);
@@ -13,14 +13,14 @@ void TextWindow::init( lv_obj_t *parent, size_t width, size_t height ) {
   lv_obj_set_height(log_container_, lv_pct(100));
 }
 
-void TextWindow::clear_logs( void ) {
+void TextWindow::clear_logs(void) {
   // clear all the logs off the page
   lv_obj_clean(log_container_);
   // now empty the string
   log_text_.clear();
 }
 
-void TextWindow::add_log( const std::string& log_text ) {
+void TextWindow::add_log(const std::string &log_text) {
   // now add to our string for storage
   log_text_ += "\n" + log_text;
   // set the string to the display

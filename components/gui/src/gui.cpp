@@ -3,9 +3,7 @@
 using namespace espp;
 using namespace std::chrono_literals;
 
-void Gui::deinit_ui() {
-  lv_obj_del(tabview_);
-}
+void Gui::deinit_ui() { lv_obj_del(tabview_); }
 
 void Gui::init_ui() {
   // Initialize the GUI
@@ -29,19 +27,20 @@ void Gui::init_ui() {
   info_window_.init(info_tab, display_->width(), display_->height());
 
   // rom screen navigation
-  // lv_obj_add_event_cb(ui_settingsbutton, &Gui::event_callback, LV_EVENT_PRESSED, static_cast<void*>(this));
-  // lv_obj_add_event_cb(ui_playbutton, &Gui::event_callback, LV_EVENT_PRESSED, static_cast<void*>(this));
+  // lv_obj_add_event_cb(ui_settingsbutton, &Gui::event_callback, LV_EVENT_PRESSED,
+  // static_cast<void*>(this)); lv_obj_add_event_cb(ui_playbutton, &Gui::event_callback,
+  // LV_EVENT_PRESSED, static_cast<void*>(this));
 }
 
 void Gui::switch_tab() {
   std::lock_guard<std::recursive_mutex> lk{mutex_};
-  auto num_tabs = ((lv_tabview_t*)tabview_)->tab_cnt;
+  auto num_tabs = ((lv_tabview_t *)tabview_)->tab_cnt;
   auto active_tab = lv_tabview_get_tab_act(tabview_);
   auto next_tab = (active_tab + 1) % num_tabs;
   lv_tabview_set_act(tabview_, next_tab, LV_ANIM_ON);
 }
 
-void Gui::push_data(const std::string& data) {
+void Gui::push_data(const std::string &data) {
   std::unique_lock<std::mutex> lock{data_queue_mutex_};
   data_queue_.push(data);
 }
@@ -61,7 +60,7 @@ void Gui::clear_info() {
   info_window_.clear_logs();
 }
 
-void Gui::add_info(const std::string& info) {
+void Gui::add_info(const std::string &info) {
   std::lock_guard<std::recursive_mutex> lk{mutex_};
   info_window_.add_log(info);
 }
@@ -70,12 +69,12 @@ bool Gui::handle_data() {
   // lock the display
   std::lock_guard<std::recursive_mutex> lk{mutex_};
 
-  bool hasNewPlotData  = false;
-  bool hasNewTextData  = false;
+  bool hasNewPlotData = false;
+  bool hasNewTextData = false;
 
   std::string newData = pop_data();
   int len = newData.length();
-  if(len > 0) {
+  if (len > 0) {
     size_t num_lines = 0;
     // logger_.info("parsing input '{}'", newData);
     // have data, parse here
@@ -85,7 +84,7 @@ bool Gui::handle_data() {
       num_lines++;
       size_t pos = 0;
       // parse for commands
-      if ( (pos = line.find(delimeter_command)) != std::string::npos) {
+      if ((pos = line.find(delimeter_command)) != std::string::npos) {
         std::string command;
         std::string plotName;
         command = line.substr(pos + delimeter_command.length(), line.length());
@@ -93,52 +92,47 @@ bool Gui::handle_data() {
           log_window_.clear_logs();
           // make sure we transition to the next state
           hasNewTextData = true;
-        }
-        else if (command == command_clear_plots) {
+        } else if (command == command_clear_plots) {
           plot_window_.clear_plots();
           // make sure we transition to the next state
           hasNewPlotData = true;
-        }
-        else if ( (pos = line.find(command_remove_plot)) != std::string::npos) {
+        } else if ((pos = line.find(command_remove_plot)) != std::string::npos) {
           plotName = line.substr(pos + command_remove_plot.length(), line.length());
-          plot_window_.remove_plot( plotName );
+          plot_window_.remove_plot(plotName);
           // make sure we transition to the next state
           hasNewPlotData = true;
         }
-      }
-      else {
+      } else {
         // parse for data
-        if ( (pos = line.find(delimeter_data)) != std::string::npos) {
+        if ((pos = line.find(delimeter_data)) != std::string::npos) {
           // found "::" so we have a plot data
           std::string plotName;
           std::string value;
           plotName = line.substr(0, pos);
           pos = pos + delimeter_data.length();
-          if ( pos < line.length() ) {
+          if (pos < line.length()) {
             int iValue;
             value = line.substr(pos, line.length());
             if (Converter::str2int(iValue, value.c_str()) == Converter::Status::Success) {
               // make sure we transition to the next state
-              plot_window_.add_data( plotName, iValue );
+              plot_window_.add_data(plotName, iValue);
               hasNewPlotData = true;
             } else {
               logger_.warn("has '::', but could not convert to number, adding log '{}'", line);
               // couldn't find that, so we just have text data
-              log_window_.add_log( line );
+              log_window_.add_log(line);
               // make sure we transition to the next state
               hasNewTextData = true;
             }
-          }
-          else {
+          } else {
             // couldn't find that, so we just have text data
-            log_window_.add_log( line );
+            log_window_.add_log(line);
             // make sure we transition to the next state
             hasNewTextData = true;
           }
-        }
-        else {
+        } else {
           // couldn't find that, so we just have text data
-          log_window_.add_log( line );
+          log_window_.add_log(line);
           // make sure we transition to the next state
           hasNewTextData = true;
         }
@@ -153,6 +147,6 @@ bool Gui::handle_data() {
 }
 
 void Gui::on_pressed(lv_event_t *e) {
-  lv_obj_t * target = lv_event_get_target(e);
+  lv_obj_t *target = lv_event_get_target(e);
   logger_.info("PRESSED: {}", fmt::ptr(target));
 }

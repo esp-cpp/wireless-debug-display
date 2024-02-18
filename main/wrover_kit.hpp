@@ -1,7 +1,7 @@
 #pragma once
 
-#include "ili9341.hpp"
 #include "button.hpp"
+#include "ili9341.hpp"
 static constexpr int DC_PIN_NUM = 21;
 
 static constexpr std::string_view dev_kit = "ESP-WROVER-DevKit";
