@@ -221,8 +221,6 @@ extern "C" void app_main(void) {
                                                           .lcd_send_lines = lcd_send_lines,
                                                           .reset_pin = reset,
                                                           .data_command_pin = dc_pin,
-                                                          .backlight_pin = backlight,
-                                                          .backlight_on_value = backlight_value,
                                                           .reset_value = reset_value,
                                                           .invert_colors = invert_colors,
                                                           .mirror_x = mirror_x,
@@ -234,6 +232,8 @@ extern "C" void app_main(void) {
                                                                                  .height = height,
                                                                                  .pixel_buffer_size = pixel_buffer_size,
                                                                                  .flush_callback = DisplayDriver::flush,
+                                                          .backlight_pin = backlight,
+                                                          .backlight_on_value = backlight_value,
                                                                                  .rotation = rotation,
                                                                                  .software_rotation_enabled = true});
 
@@ -279,21 +279,18 @@ extern "C" void app_main(void) {
 
 #if CONFIG_HARDWARE_BOX
   logger.info("Initializing Tt21100");
-  espp::Tt21100 touch({
-      .read = std::bind(&espp::I2c::read, &i2c, std::placeholders::_1, std::placeholders::_2,
-                        std::placeholders::_3),
-    });
+  using TouchDriver = espp::Tt21100;
 #endif
 #if CONFIG_HARDWARE_TDECK || CONFIG_HARDWARE_BOX_3
   logger.info("Initializing GT911");
+  using TouchDriver = espp::Gt911;
   // implement GT911
-  espp::Gt911 touch({.write = std::bind(&espp::I2c::write, &i2c, std::placeholders::_1,
-                                        std::placeholders::_2, std::placeholders::_3),
-      .write_read = std::bind(&espp::I2c::write_read, &i2c, std::placeholders::_1,
-                              std::placeholders::_2, std::placeholders::_3,
-                              std::placeholders::_4, std::placeholders::_5)});
-
 #endif
+  TouchDriver touch({.write = std::bind(&espp::I2c::write, &i2c, std::placeholders::_1,
+                                        std::placeholders::_2, std::placeholders::_3),
+      .read = std::bind(&espp::I2c::read, &i2c, std::placeholders::_1,
+                        std::placeholders::_2, std::placeholders::_3)});
+
 
   auto touchpad_read = [&touch](uint8_t* num_touch_points, uint16_t* x, uint16_t* y, uint8_t* btn_state) {
     std::error_code ec;
