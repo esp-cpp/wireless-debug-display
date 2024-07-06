@@ -11,9 +11,21 @@ set(EXTRA_COMPONENT_DIRS
   "components/esp-protocols/components"
 )
 
+# set the hal component to use based on the target
+if(IDF_TARGET STREQUAL "esp32")
+  #append the components that we want to use
+  set(HAL_COMPONENTS "wrover-kit")
+  message(WARNING "ESP32 target, using components: ${HAL_COMPONENTS}")
+elseif(IDF_TARGET STREQUAL "esp32s3")
+  set(HAL_COMPONENTS "t-deck esp-box")
+  message(WARNING "ESP32-S3 target, using components: ${HAL_COMPONENTS}")
+else()
+  message(FATAL_ERROR "Unsupported target: ${IDF_TARGET}")
+endif()
+
 set(
   COMPONENTS
-  "main esptool_py driver lwip button display display_drivers input_drivers logger lvgl mdns socket task tt21100 gt911 wifi gui i2c"
+  "main esptool_py driver lwip button logger lvgl mdns socket task wifi gui nvs ${HAL_COMPONENTS}"
   CACHE STRING
   "List of components to include"
   )
