@@ -1,5 +1,8 @@
 CONFIG_FREERTOS_HZ=1000
 
+# set compiler optimization level to -O2 (compile for performance)
+CONFIG_COMPILER_OPTIMIZATION_PERF=y
+
 # ESP32-specific
 #
 CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ_240=y
@@ -12,6 +15,10 @@ CONFIG_ESP_MAIN_TASK_STACK_SIZE=8192
 
 CONFIG_ESPTOOLPY_FLASHSIZE_4MB=y
 CONFIG_ESPTOOLPY_FLASHSIZE="4MB"
+CONFIG_ESPTOOLPY_FLASHMODE_QIO=y # over twice as fast as DIO
+
+# set the functions into IRAM
+CONFIG_SPI_MASTER_IN_IRAM=y
 
 #
 # Partition Table
