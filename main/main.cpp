@@ -3,27 +3,23 @@
 #include <chrono>
 #include <thread>
 
-#include <driver/spi_master.h>
-#include <hal/spi_types.h>
 #include <mdns.h>
-#if CONFIG_ESP32_WIFI_NVS_ENABLED
-#include <nvs_flash.h>
-#endif
-
-#include "display.hpp"
 
 #if CONFIG_HARDWARE_WROVER_KIT
-#include "wrover_kit.hpp"
+#include "wrover-kit.hpp"
 #elif CONFIG_HARDWARE_BOX
-#include "box.hpp"
-#elif CONFIG_HARDWARE_BOX_3
-#include "box_3.hpp"
+#include "esp-box.hpp"
 #elif CONFIG_HARDWARE_TDECK
-#include "tdeck.hpp"
+#include "t-deck.hpp"
 #else
 #error "Misconfigured hardware!"
 #endif
 
+#if CONFIG_ESP32_WIFI_NVS_ENABLED
+#include "nvs.hpp"
+#endif
+
+#include "button.hpp"
 #include "gui.hpp"
 #include "logger.hpp"
 #include "task.hpp"
@@ -33,210 +29,42 @@
 
 using namespace std::chrono_literals;
 
-static spi_device_handle_t spi;
-static const int spi_queue_size = 7;
-static size_t num_queued_trans = 0;
-
-// the user flag for the callbacks does two things:
-// 1. Provides the GPIO level for the data/command pin, and
-// 2. Sets some bits for other signaling (such as LVGL FLUSH)
-static constexpr int FLUSH_BIT = (1 << (int)espp::display_drivers::Flags::FLUSH_BIT);
-static constexpr int DC_LEVEL_BIT = (1 << (int)espp::display_drivers::Flags::DC_LEVEL_BIT);
-
-// This function is called (in irq context!) just before a transmission starts.
-// It will set the D/C line to the value indicated in the user field
-// (DC_LEVEL_BIT).
-static void IRAM_ATTR lcd_spi_pre_transfer_callback(spi_transaction_t *t) {
-  uint32_t user_flags = (uint32_t)(t->user);
-  bool dc_level = user_flags & DC_LEVEL_BIT;
-  gpio_set_level((gpio_num_t)DC_PIN_NUM, dc_level);
-}
-
-// This function is called (in irq context!) just after a transmission ends. It
-// will indicate to lvgl that the next flush is ready to be done if the
-// FLUSH_BIT is set.
-static void IRAM_ATTR lcd_spi_post_transfer_callback(spi_transaction_t *t) {
-  uint16_t user_flags = (uint32_t)(t->user);
-  bool should_flush = user_flags & FLUSH_BIT;
-  if (should_flush) {
-    lv_disp_t *disp = _lv_refr_get_disp_refreshing();
-    lv_disp_flush_ready(disp->driver);
-  }
-}
-
-extern "C" void IRAM_ATTR lcd_write(const uint8_t *data, size_t length, uint32_t user_data) {
-  if (length == 0) {
-    return;
-  }
-  static spi_transaction_t t;
-  memset(&t, 0, sizeof(t));
-  t.length = length * 8;
-  t.tx_buffer = data;
-  t.user = (void *)user_data;
-  spi_device_polling_transmit(spi, &t);
-}
-
-static void lcd_wait_lines() {
-  spi_transaction_t *rtrans;
-  esp_err_t ret;
-  // Wait for all transactions to be done and get back the results.
-  while (num_queued_trans) {
-    // fmt::print("Waiting for {} lines\n", num_queued_trans);
-    ret = spi_device_get_trans_result(spi, &rtrans, portMAX_DELAY);
-    if (ret != ESP_OK) {
-      fmt::print("Could not get trans result: {} '{}'\n", ret, esp_err_to_name(ret));
-    }
-    num_queued_trans--;
-    // We could inspect rtrans now if we received any info back. The LCD is treated as write-only,
-    // though.
-  }
-}
-
-void IRAM_ATTR lcd_send_lines(int xs, int ys, int xe, int ye, const uint8_t *data,
-                              uint32_t user_data) {
-  // if we haven't waited by now, wait here...
-  lcd_wait_lines();
-  esp_err_t ret;
-  // Transaction descriptors. Declared static so they're not allocated on the stack; we need this
-  // memory even when this function is finished because the SPI driver needs access to it even while
-  // we're already calculating the next line.
-  static spi_transaction_t trans[6];
-  // In theory, it's better to initialize trans and data only once and hang on to the initialized
-  // variables. We allocate them on the stack, so we need to re-init them each call.
-  for (int i = 0; i < 6; i++) {
-    memset(&trans[i], 0, sizeof(spi_transaction_t));
-    if ((i & 1) == 0) {
-      // Even transfers are commands
-      trans[i].length = 8;
-      trans[i].user = (void *)0;
-    } else {
-      // Odd transfers are data
-      trans[i].length = 8 * 4;
-      trans[i].user = (void *)DC_LEVEL_BIT;
-    }
-    trans[i].flags = SPI_TRANS_USE_TXDATA;
-  }
-  size_t length = (xe - xs + 1) * (ye - ys + 1) * 2;
-  trans[0].tx_data[0] = (uint8_t)DisplayDriver::Command::caset;
-  trans[1].tx_data[0] = (xs) >> 8;
-  trans[1].tx_data[1] = (xs)&0xff;
-  trans[1].tx_data[2] = (xe) >> 8;
-  trans[1].tx_data[3] = (xe)&0xff;
-  trans[2].tx_data[0] = (uint8_t)DisplayDriver::Command::raset;
-  trans[3].tx_data[0] = (ys) >> 8;
-  trans[3].tx_data[1] = (ys)&0xff;
-  trans[3].tx_data[2] = (ye) >> 8;
-  trans[3].tx_data[3] = (ye)&0xff;
-  trans[4].tx_data[0] = (uint8_t)DisplayDriver::Command::ramwr;
-  trans[5].tx_buffer = data;
-  trans[5].length = length * 8;
-  // undo SPI_TRANS_USE_TXDATA flag
-  trans[5].flags = 0;
-  // we need to keep the dc bit set, but also add our flags
-  trans[5].user = (void *)(DC_LEVEL_BIT | user_data);
-  // Queue all transactions.
-  for (int i = 0; i < 6; i++) {
-    ret = spi_device_queue_trans(spi, &trans[i], portMAX_DELAY);
-    if (ret != ESP_OK) {
-      fmt::print("Couldn't queue trans: {} '{}'\n", ret, esp_err_to_name(ret));
-    } else {
-      num_queued_trans++;
-    }
-  }
-  // When we are here, the SPI driver is busy (in the background) getting the
-  // transactions sent. That happens mostly using DMA, so the CPU doesn't have
-  // much to do here. We're not going to wait for the transaction to finish
-  // because we may as well spend the time calculating the next line. When that
-  // is done, we can call send_line_finish, which will wait for the transfers
-  // to be done and check their status.
-}
-
 extern "C" void app_main(void) {
-  static auto start = std::chrono::high_resolution_clock::now();
-  static auto elapsed = [&]() {
-    auto now = std::chrono::high_resolution_clock::now();
-    return std::chrono::duration<float>(now - start).count();
-  };
-
   espp::Logger logger({.tag = "WirelessDebugDisplay", .level = espp::Logger::Verbosity::INFO});
-
   logger.info("Bootup");
 
 #if CONFIG_ESP32_WIFI_NVS_ENABLED
   // initialize NVS, needed for WiFi
-  esp_err_t ret = nvs_flash_init();
-  if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND) {
-    logger.warn("Erasing NVS flash...");
-    ESP_ERROR_CHECK(nvs_flash_erase());
-    ret = nvs_flash_init();
-  }
-  ESP_ERROR_CHECK(ret);
+  std::error_code ec;
+  espp::Nvs nvs;
+  nvs.init(ec);
 #endif
 
   // hardware specific configuration
 #if CONFIG_HARDWARE_WROVER_KIT
+  auto &hal = espp::WroverKit::get();
 #endif
 #if CONFIG_HARDWARE_BOX
+  auto &hal = espp::EspBox::get();
 #endif
 #if CONFIG_HARDWARE_TDECK
-  // peripheral power on t-deck requires the power pin to be set (gpio 10)
-  // so set up gpio output and set it high
-  gpio_num_t BOARD_POWER_ON_PIN = GPIO_NUM_10;
-  gpio_set_direction(BOARD_POWER_ON_PIN, GPIO_MODE_OUTPUT);
-  gpio_set_level(BOARD_POWER_ON_PIN, 1);
-
-  gpio_num_t KEYBOARD_INTERRUPT_PIN = GPIO_NUM_46;
-  gpio_set_direction(KEYBOARD_INTERRUPT_PIN, GPIO_MODE_INPUT);
+  auto &hal = espp::TDeck::get();
 #endif
 
-  logger.info("Initializing display drivers for {}", dev_kit);
-  // create the spi host
-  spi_bus_config_t buscfg;
-  memset(&buscfg, 0, sizeof(buscfg));
-  buscfg.mosi_io_num = mosi;
-  buscfg.miso_io_num = -1;
-  buscfg.sclk_io_num = sclk;
-  buscfg.quadwp_io_num = -1;
-  buscfg.quadhd_io_num = -1;
-  buscfg.max_transfer_sz = (int)(pixel_buffer_size * sizeof(lv_color_t));
-  // create the spi device
-  spi_device_interface_config_t devcfg;
-  memset(&devcfg, 0, sizeof(devcfg));
-  devcfg.mode = 0;
-  devcfg.clock_speed_hz = clock_speed;
-  devcfg.input_delay_ns = 0;
-  devcfg.spics_io_num = spics;
-  devcfg.queue_size = spi_queue_size;
-  devcfg.pre_cb = lcd_spi_pre_transfer_callback;
-  devcfg.post_cb = lcd_spi_post_transfer_callback;
+  hal.set_log_level(espp::Logger::Verbosity::INFO);
 
-  // Initialize the SPI bus
-  ret = spi_bus_initialize(spi_num, &buscfg, SPI_DMA_CH_AUTO);
-  ESP_ERROR_CHECK(ret);
-  // Attach the LCD to the SPI bus
-  ret = spi_bus_add_device(spi_num, &devcfg, &spi);
-  ESP_ERROR_CHECK(ret);
-  // initialize the controller
-  DisplayDriver::initialize(espp::display_drivers::Config{
-      .lcd_write = lcd_write,
-      .lcd_send_lines = lcd_send_lines,
-      .reset_pin = reset,
-      .data_command_pin = dc_pin,
-      .reset_value = reset_value,
-      .invert_colors = invert_colors,
-      .mirror_x = mirror_x,
-      .mirror_y = mirror_y,
-  });
-  // initialize the display / lvgl
-  auto display = std::make_shared<espp::Display>(
-      espp::Display::AllocatingConfig{.width = width,
-                                      .height = height,
-                                      .pixel_buffer_size = pixel_buffer_size,
-                                      .flush_callback = DisplayDriver::flush,
-                                      .backlight_pin = backlight,
-                                      .backlight_on_value = backlight_value,
-                                      .rotation = rotation,
-                                      .software_rotation_enabled = true});
+  if (!hal.initialize_lcd()) {
+    logger.error("Could not initialize LCD");
+    return;
+  }
+  // initialize the display, using a pixel buffer of 50 lines
+  static constexpr size_t pixel_buffer_size = hal.lcd_width() * 50;
+  if (!hal.initialize_display(pixel_buffer_size)) {
+    logger.error("Could not initialize display");
+    return;
+  }
+
+  auto display = hal.display();
 
   // create the gui
   Gui gui({.display = display, .log_level = espp::Logger::Verbosity::DEBUG});
@@ -244,65 +72,36 @@ extern "C" void app_main(void) {
   // initialize the input system
 #if CONFIG_HARDWARE_WROVER_KIT
   espp::Button button({
-      .gpio_num = GPIO_NUM_0,
-      .callback = [&](const espp::Button::Event &event) { gui.switch_tab(); },
-      .active_level = espp::Button::ActiveLevel::LOW,
-      .interrupt_type = espp::Button::InterruptType::RISING_EDGE,
-      .pullup_enabled = false,
-      .pulldown_enabled = false,
+      .interrupt_config =
+          {
+              .gpio_num = GPIO_NUM_0,
+              .callback = [&](const espp::Button::Event &event) { gui.switch_tab(); },
+              .active_level = espp::Button::ActiveLevel::LOW,
+              .interrupt_type = espp::Button::InterruptType::RISING_EDGE,
+              .pullup_enabled = false,
+              .pulldown_enabled = false,
+          },
       .log_level = espp::Logger::Verbosity::WARN,
   });
 #endif
-#if CONFIG_HARDWARE_BOX || CONFIG_HARDWARE_BOX_3 || CONFIG_HARDWARE_TDECK
-  // initialize the i2c bus to read the touchpad driver
-  espp::I2c i2c({
-      .port = I2C_NUM_0,
-      .sda_io_num = i2c_sda,
-      .scl_io_num = i2c_scl,
-      .sda_pullup_en = GPIO_PULLUP_ENABLE,
-      .scl_pullup_en = GPIO_PULLUP_ENABLE,
-      .clk_speed = 400 * 1000,
-  });
-
-  // probe for the touch devices:
-  // tt21100, gt911
-  bool has_tt21100 = false;
-  bool has_gt911 = false;
-  has_tt21100 = i2c.probe_device(0x24);
-  has_gt911 = i2c.probe_device(0x5d) | i2c.probe_device(0x14);
-  logger.info("Touchpad probe results: tt21100: {}, gt911: {}", has_tt21100, has_gt911);
-
-#if CONFIG_HARDWARE_BOX
-  logger.info("Initializing Tt21100");
-  using TouchDriver = espp::Tt21100;
-#endif
-#if CONFIG_HARDWARE_TDECK || CONFIG_HARDWARE_BOX_3
-  logger.info("Initializing GT911");
-  using TouchDriver = espp::Gt911;
-  // implement GT911
-#endif
-  TouchDriver touch({.write = std::bind(&espp::I2c::write, &i2c, std::placeholders::_1,
-                                        std::placeholders::_2, std::placeholders::_3),
-                     .read = std::bind(&espp::I2c::read, &i2c, std::placeholders::_1,
-                                       std::placeholders::_2, std::placeholders::_3)});
-
-  auto touchpad_read = [&touch](uint8_t *num_touch_points, uint16_t *x, uint16_t *y,
-                                uint8_t *btn_state) {
-    std::error_code ec;
-    *num_touch_points = 0;
-    // get the latest data from the device
-    if (touch.update(ec) && !ec) {
-      touch.get_touch_point(num_touch_points, x, y);
-    }
-    *btn_state = touch.get_home_button_state();
+#if CONFIG_HARDWARE_BOX || CONFIG_HARDWARE_TDECK
+  if (!hal.initialize_touch()) {
+    logger.error("Could not initialize touch");
+    return;
+  }
+  // make a task to run the touch update
+  auto touch_task_config = espp::Task::Config{
+      .name = "TouchTask",
+      .callback =
+          [&](auto &m, auto &cv) {
+            hal.update_touch();
+            std::this_thread::sleep_for(10ms);
+            return false;
+          },
+      .stack_size_bytes = 6 * 1024,
   };
-  logger.info("Initializing touchpad");
-  auto touchpad =
-      espp::TouchpadInput(espp::TouchpadInput::Config{.touchpad_read = touchpad_read,
-                                                      .swap_xy = touch_swap_xy,
-                                                      .invert_x = touch_invert_x,
-                                                      .invert_y = touch_invert_y,
-                                                      .log_level = espp::Logger::Verbosity::WARN});
+  espp::Task touch_task(touch_task_config);
+  touch_task.start();
 #endif
 
   // initialize WiFi
@@ -350,6 +149,7 @@ extern "C" void app_main(void) {
 }
 }
 ;
+
 server_socket.start_receiving(server_task_config, server_config);
 
 // initialize mDNS, so that other embedded devices on the network can find us

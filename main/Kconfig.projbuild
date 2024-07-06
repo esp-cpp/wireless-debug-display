@@ -6,12 +6,13 @@ menu "Wireless Debug Display Configuration"
         help
             Select the dev-kit / hardware you're using.
         config HARDWARE_WROVER_KIT
+            depends on IDF_TARGET_ESP32
             bool "ESP32 WROVER KIT V4"
         config HARDWARE_BOX
-            bool "ESP BOX"
-        config HARDWARE_BOX_3
-            bool "ESP BOX 3"
+            depends on IDF_TARGET_ESP32S3
+            bool "ESP BOX (ESP32-S3-BOX or ESP32-S3-BOX-3)"
         config HARDWARE_TDECK
+            depends on IDF_TARGET_ESP32S3
             bool "LILYGO T DECK"
     endchoice
 
