@@ -12,6 +12,7 @@ public:
 
   void init(lv_obj_t *parent, size_t width, size_t height) override;
   void update() override;
+  void set_max_point_count(size_t max_point_count);
 
   void clear_plots(void);
   void add_data(const std::string &plot_name, int new_data);
@@ -24,8 +25,9 @@ protected:
   void update_ticks(void);
 
 private:
+  lv_obj_t *wrapper_{nullptr};
+  lv_obj_t *y_scale_{nullptr};
   lv_obj_t *chart_{nullptr};
   lv_obj_t *legend_{nullptr};
-  std::string y_ticks_{""};
   std::unordered_map<std::string, lv_chart_series_t *> plot_map_{};
 };

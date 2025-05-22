@@ -3,7 +3,10 @@
 void TextWindow::init(lv_obj_t *parent, size_t width, size_t height) {
   Window::init(parent, width, height);
   log_container_ = lv_label_create(parent_);
-  lv_label_set_recolor(log_container_, true);
+  // NOTE: in LVGL v9 (up to 9.2.2) text recoloring was removed. In the future
+  //       (>=9.2.3) it will be added back.
+  //
+  // lv_label_set_recolor(log_container_, true);
 
   // wrap text on long lines
   lv_label_set_long_mode(log_container_, LV_LABEL_LONG_WRAP);

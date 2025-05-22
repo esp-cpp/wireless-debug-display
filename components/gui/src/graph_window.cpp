@@ -1,14 +1,24 @@
 #include "graph_window.hpp"
 
+#include "format.hpp"
+
+#include <widgets/chart/lv_chart_private.h>
+
 void GraphWindow::init(lv_obj_t *parent, size_t width, size_t height) {
   Window::init(parent, width, height);
+  // create a transparent wrapper for the chart and the scale.
+  wrapper_ = lv_obj_create(parent_);
+  lv_obj_remove_style_all(wrapper_);
+  lv_obj_set_size(wrapper_, lv_pct(100), lv_pct(100));
+
   // Create a chart
-  chart_ = lv_chart_create(parent_);
+  chart_ = lv_chart_create(wrapper_);
+  lv_chart_set_update_mode(chart_, LV_CHART_UPDATE_MODE_SHIFT);
 
   // we need to make the width of the chart less than the parent full width to
   // leave room for tick labels
   lv_obj_set_width(chart_, lv_pct(90));
-  lv_obj_set_height(chart_, lv_pct(100));
+  lv_obj_set_height(chart_, lv_pct(95));
 
   // the y axis labels are on the left of the chart, so align the chart on the
   // right side of the parent to leave room for tick labels
@@ -18,48 +28,75 @@ void GraphWindow::init(lv_obj_t *parent, size_t width, size_t height) {
   lv_chart_set_type(chart_, LV_CHART_TYPE_LINE);
 
   // update the tick values
-  size_t major_tick_length = 5;
-  size_t minor_tick_length = 2;
+  size_t major_tick_length = 6;
+  size_t minor_tick_length = 3;
   size_t major_tick_count = 5;
   size_t minor_tick_count = 2;
+  size_t total_tick_count = major_tick_count * minor_tick_count + 1;
   bool label_enabled = true;
-  size_t draw_size = 50;
-  lv_chart_set_axis_tick(chart_, LV_CHART_AXIS_PRIMARY_Y, major_tick_length, minor_tick_length,
-                         major_tick_count, minor_tick_count, label_enabled, draw_size);
+
+  // create the scale for the y-axis
+  y_scale_ = lv_scale_create(wrapper_);
+  lv_obj_set_size(y_scale_, lv_pct(10), lv_pct(95));
+  lv_obj_align(y_scale_, LV_ALIGN_LEFT_MID, 0, 0);
+  lv_scale_set_mode(y_scale_, LV_SCALE_MODE_VERTICAL_LEFT);
+  lv_scale_set_label_show(y_scale_, label_enabled);
+  lv_scale_set_total_tick_count(y_scale_, total_tick_count);
+  lv_scale_set_major_tick_every(y_scale_, major_tick_count);
+  lv_obj_set_style_length(y_scale_, minor_tick_length, LV_PART_ITEMS);
+  lv_obj_set_style_length(y_scale_, major_tick_length, LV_PART_INDICATOR);
 
   // create the legend
-  legend_ = lv_label_create(chart_);
-  lv_obj_align(legend_, LV_ALIGN_TOP_RIGHT, -7, 5);
-  lv_label_set_text(legend_, "");
+  legend_ = lv_spangroup_create(chart_);
+  lv_obj_set_width(legend_, lv_pct(100));
+  lv_obj_set_height(legend_, LV_SIZE_CONTENT);
+  lv_obj_align(legend_, LV_ALIGN_TOP_RIGHT, 0, 0);
+  lv_spangroup_set_align(legend_, LV_TEXT_ALIGN_RIGHT);
+  lv_spangroup_set_mode(legend_, LV_SPAN_MODE_BREAK);
+  lv_spangroup_set_max_lines(legend_, -1); // no limit
+  lv_spangroup_set_indent(legend_, 0);
 
   // create a style for the chart
   // give some padding to the chart - especially on the left where we
   // have the y axis labels / ticks.
+  lv_chart_set_div_line_count(chart_, 5, 7);
   lv_obj_set_style_border_width(chart_, 0, 0);
-  lv_obj_set_style_pad_left(chart_, 60, 0);
-  lv_obj_set_style_pad_bottom(chart_, 36, 0);
-  lv_obj_set_style_pad_right(chart_, 25, 0);
-  lv_obj_set_style_pad_top(chart_, 20, 0);
+  lv_obj_set_style_pad_all(chart_, 0, 0);
+}
+
+void GraphWindow::set_max_point_count(size_t max_point_count) {
+  // set the maximum number of points to be displayed on the chart
+  lv_chart_set_point_count(chart_, max_point_count);
 }
 
 void GraphWindow::update_ticks() {
-
+  if (plot_map_.empty()) {
+    // if we have no plots, then we don't need to do anything
+    return;
+  }
   // get the minimum and maximum
-  lv_coord_t min = 0, max = 0;
+  std::vector<lv_coord_t> y_points;
+
   auto num_points = lv_chart_get_point_count(chart_);
-  for (auto e : plot_map_) {
+  for (const auto &e : plot_map_) {
     auto series = e.second;
     for (size_t i = 0; i < num_points; i++) {
       auto point = series->y_points[i];
-      if (point < min)
-        min = point;
-      if (point > max)
-        max = point;
+      if (point == LV_CHART_POINT_NONE) {
+        // skip this point
+        continue;
+      }
+      y_points.push_back(series->y_points[i]);
     }
   }
 
+  // get the min/max values
+  auto min = *std::min_element(y_points.begin(), y_points.end());
+  auto max = *std::max_element(y_points.begin(), y_points.end());
+
   // update the chart range
   lv_chart_set_range(chart_, LV_CHART_AXIS_PRIMARY_Y, min, max);
+  lv_scale_set_range(y_scale_, min, max);
 }
 
 void GraphWindow::update() {
@@ -78,7 +115,9 @@ void GraphWindow::clear_plots(void) {
   // now clear the map
   plot_map_.clear();
   // clear the legend
-  lv_label_set_text(legend_, "");
+  while (lv_spangroup_get_child(legend_, 0)) {
+    lv_spangroup_delete_span(legend_, lv_spangroup_get_child(legend_, 0));
+  }
 }
 
 void GraphWindow::add_data(const std::string &plotName, int newData) {
@@ -99,15 +138,14 @@ lv_chart_series_t *GraphWindow::create_plot(const std::string &plotName) {
   // now make the plot
   auto plot = lv_chart_add_series(chart_, color, LV_CHART_AXIS_PRIMARY_Y);
 
-  // Add text to legend, #XXX <string># will be a colored string, if we set the
-  // recolor property to true on the label
-  char label_buf[50];
-  sprintf(label_buf, "#%02X%02X%02X - %s#\n", red, green, blue, plotName.c_str());
-  char *current_legend = lv_label_get_text(legend_);
-  auto new_text = std::string(current_legend);
-  new_text += label_buf;
-  lv_label_set_text(legend_, new_text.c_str());
-  lv_label_set_recolor(legend_, true);
+  // create a new span for the new legend text
+  auto span = lv_spangroup_new_span(legend_);
+  // set the text to be the color of the plot
+  std::string legend_text = fmt::format("{} -\n", plotName);
+  lv_span_set_text(span, legend_text.c_str());
+  lv_style_set_text_color(lv_span_get_style(span), color);
+
+  lv_spangroup_refr_mode(legend_);
 
   // add it to the map
   plot_map_[plotName] = plot;
