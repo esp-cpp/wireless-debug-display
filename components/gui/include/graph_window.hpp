@@ -29,6 +29,5 @@ private:
   lv_obj_t *y_scale_{nullptr};
   lv_obj_t *chart_{nullptr};
   lv_obj_t *legend_{nullptr};
-  std::string y_ticks_{""};
   std::unordered_map<std::string, lv_chart_series_t *> plot_map_{};
 };
