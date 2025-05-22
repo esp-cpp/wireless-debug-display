@@ -9,8 +9,6 @@ jobs:
     steps:
     - name: Checkout repo
       uses: actions/checkout@v4
-      with:
-        submodules: 'recursive'
 
     - name: Run static analysis
       uses: esp-cpp/StaticAnalysis@master
@@ -19,7 +17,7 @@ jobs:
         use_cmake: false
 
         # Use the 5.2 release version since it's what we build with
-        esp_idf_version: release/v5.2
+        esp_idf_version: release/v5.4
 
         # (Optional) cppcheck args
-        cppcheck_args: -i$GITHUB_WORKSPACE/components/espp -i$GITHUB_WORKSPACE/components/esp-protocols --force --enable=all --inline-suppr --inconclusive --platform=mips32 --std=c++17 --suppressions-list=$GITHUB_WORKSPACE/suppressions.txt
+        cppcheck_args: --check-level=exhaustive --force --enable=all --inline-suppr --inconclusive --platform=mips32 --std=c++17 --suppressions-list=$GITHUB_WORKSPACE/suppressions.txt
