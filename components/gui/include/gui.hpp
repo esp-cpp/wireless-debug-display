@@ -39,9 +39,9 @@ public:
     plot_window_.clear_plots();
     // now start the gui updater task
     using namespace std::placeholders;
-    task_ = espp::Task::make_unique(espp::Task::Config{
-        .callback = [this](auto &m, auto &cv) -> bool { return this->update(m, cv); },
-        .task_config = {.name = "Gui Task", .stack_size_bytes = 6 * 1024}});
+    task_ = espp::Task::make_unique(
+        espp::Task::Config{.callback = [this](auto &m, auto &cv) -> bool { return update(m, cv); },
+                           .task_config = {.name = "Gui Task", .stack_size_bytes = 6 * 1024}});
     task_->start();
   }
 
