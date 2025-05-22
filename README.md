@@ -97,22 +97,6 @@ All other text is treated as a log and written out to the log
 window. Note, we do not wrap lines, so any text that would go off the
 edge of the screen is simply not rendered.
 
-## Cloning
-
-Since this repo contains a submodule, you need to make sure you clone it
-recursively, e.g. with:
-
-``` sh
-git clone --recurse-submodules <your repo name>
-```
-
-Alternatively, you can always ensure the submodules are up to date after cloning
-(or if you forgot to clone recursively) by running:
-
-``` sh
-git submodule update --init --recursive
-```
-
 ## Build and Flash
 
 Build the project and flash it to the board, then run monitor tool to view serial output:
