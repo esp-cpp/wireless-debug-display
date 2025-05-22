@@ -67,7 +67,7 @@ extern "C" void app_main(void) {
   auto display = hal.display();
 
   // create the gui
-  Gui gui({.display = display, .log_level = espp::Logger::Verbosity::DEBUG});
+  Gui gui(Gui::Config{.display = display, .log_level = espp::Logger::Verbosity::DEBUG});
 
   // initialize the input system
 #if CONFIG_HARDWARE_WROVER_KIT
@@ -89,19 +89,6 @@ extern "C" void app_main(void) {
     logger.error("Could not initialize touch");
     return;
   }
-  // make a task to run the touch update
-  auto touch_task_config = espp::Task::Config{
-      .name = "TouchTask",
-      .callback =
-          [&](auto &m, auto &cv) {
-            hal.update_touch();
-            std::this_thread::sleep_for(10ms);
-            return false;
-          },
-      .stack_size_bytes = 6 * 1024,
-  };
-  espp::Task touch_task(touch_task_config);
-  touch_task.start();
 #endif
 
   // initialize WiFi
@@ -129,9 +116,8 @@ extern "C" void app_main(void) {
   logger.info("Creating debug server at {}:{}", server_address, server_port);
   // create the socket
   espp::UdpSocket server_socket({.log_level = espp::Logger::Verbosity::WARN});
-  auto server_task_config = espp::Task::Config{
+  auto server_task_config = espp::Task::BaseConfig{
       .name = "UdpServer",
-      .callback = nullptr,
       .stack_size_bytes = 6 * 1024,
   };
   auto server_config = espp::UdpSocket::ReceiveConfig{

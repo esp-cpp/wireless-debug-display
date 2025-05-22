@@ -9,7 +9,9 @@ void Gui::init_ui() {
   // Initialize the GUI
   const auto tab_location = LV_DIR_TOP;
   const size_t tab_height = 20;
-  tabview_ = lv_tabview_create(lv_scr_act(), tab_location, tab_height);
+  tabview_ = lv_tabview_create(lv_scr_act());
+  lv_tabview_set_tab_bar_position(tabview_, tab_location);
+  lv_tabview_set_tab_bar_size(tabview_, tab_height);
 
   // create the plotting tab and hide the scrollbars
   auto plot_tab = lv_tabview_add_tab(tabview_, "Plots");
@@ -34,7 +36,7 @@ void Gui::init_ui() {
 
 void Gui::switch_tab() {
   std::lock_guard<std::recursive_mutex> lk{mutex_};
-  auto num_tabs = ((lv_tabview_t *)tabview_)->tab_cnt;
+  auto num_tabs = lv_tabview_get_tab_count(tabview_);
   auto active_tab = lv_tabview_get_tab_act(tabview_);
   auto next_tab = (active_tab + 1) % num_tabs;
   lv_tabview_set_act(tabview_, next_tab, LV_ANIM_ON);
@@ -146,6 +148,6 @@ bool Gui::handle_data() {
 }
 
 void Gui::on_pressed(lv_event_t *e) {
-  lv_obj_t *target = lv_event_get_target(e);
+  lv_obj_t *target = (lv_obj_t *)lv_event_get_target(e);
   logger_.info("PRESSED: {}", fmt::ptr(target));
 }

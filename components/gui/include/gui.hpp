@@ -16,6 +16,9 @@
 
 class Gui {
 public:
+  using Pixel = lv_color16_t;
+  using Display = espp::Display<Pixel>;
+
   const std::string delimeter_data = "::"; ///< Delimeter indicating this contains plottable data
   const std::string delimeter_command = "+++";   ///< Delimeter indicating this contains a command
   const std::string command_remove_plot = "RP:"; ///< Command: remove plot
@@ -23,19 +26,22 @@ public:
   const std::string command_clear_logs = "CL";   ///< Command: clear logs
 
   struct Config {
-    std::shared_ptr<espp::Display> display;
-    espp::Logger::Verbosity log_level{espp::Logger::Verbosity::WARN};
+    std::shared_ptr<Display> display; ///< Display to use
+    size_t max_chart_point_count{30}; ///< Max number of points to show on the chart
+    espp::Logger::Verbosity log_level{espp::Logger::Verbosity::WARN}; ///< Log level
   };
 
   explicit Gui(const Config &config)
       : display_(config.display)
       , logger_({.tag = "Gui", .level = config.log_level}) {
     init_ui();
+    plot_window_.set_max_point_count(config.max_chart_point_count);
+    plot_window_.clear_plots();
     // now start the gui updater task
     using namespace std::placeholders;
-    task_ = espp::Task::make_unique({.name = "Gui Task",
-                                     .callback = std::bind(&Gui::update, this, _1, _2),
-                                     .stack_size_bytes = 6 * 1024});
+    task_ = espp::Task::make_unique(espp::Task::Config{
+        .callback = [this](auto &m, auto &cv) -> bool { return this->update(m, cv); },
+        .task_config = {.name = "Gui Task", .stack_size_bytes = 6 * 1024}});
     task_->start();
   }
 
@@ -53,6 +59,8 @@ public:
   void add_info(const std::string &info);
 
   bool handle_data();
+
+  void set_chart_max_point_count(size_t count) { plot_window_.set_max_point_count(count); }
 
 protected:
   void init_ui();
@@ -107,7 +115,7 @@ protected:
   std::mutex data_queue_mutex_;
   std::queue<std::string> data_queue_;
 
-  std::shared_ptr<espp::Display> display_;
+  std::shared_ptr<Display> display_;
   std::unique_ptr<espp::Task> task_;
 
   espp::Logger logger_;
