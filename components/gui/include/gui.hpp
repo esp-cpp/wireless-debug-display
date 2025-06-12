@@ -41,7 +41,7 @@ public:
     using namespace std::placeholders;
     task_ = espp::Task::make_unique(
         espp::Task::Config{.callback = [this](auto &m, auto &cv) -> bool { return update(m, cv); },
-                           .task_config = {.name = "Gui Task", .stack_size_bytes = 6 * 1024}});
+                           .task_config = {.name = "Gui Task", .stack_size_bytes = 10 * 1024}});
     task_->start();
   }
 
