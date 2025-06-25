@@ -89,6 +89,8 @@ info about the commands available.
 Any SSID/Password you set will be securely saved in the board's NVS, which is
 managed by the ESP-IDF WiFi subsystem.
 
+![CleanShot 2025-06-25 at 09 42 28](https://github.com/user-attachments/assets/680f2dbc-e75a-4359-8e18-752df31c42bd)
+
 ```console
 sta> help
 Commands available:
