@@ -232,7 +232,9 @@ extern "C" void app_main(void) {
   input.Start();
 }
 
-bool start_server(std::mutex &m, std::condition_variable &cv, bool &task_notified) {
+bool start_server(std::mutex &m,               // cppcheck-suppress constParameterCallback
+                  std::condition_variable &cv, // cppcheck-suppress constParameterCallback
+                  bool &task_notified) {       // cppcheck-suppress constParameterCallback
   // create the debug display socket
   logger.info("Creating debug server at {}:{}", server_address, server_port);
   // create the socket
