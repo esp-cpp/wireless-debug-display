@@ -62,6 +62,16 @@ void Gui::clear_info() {
   info_window_.clear_logs();
 }
 
+void Gui::clear_plots() {
+  std::lock_guard<std::recursive_mutex> lk{mutex_};
+  plot_window_.clear_plots();
+}
+
+void Gui::clear_logs() {
+  std::lock_guard<std::recursive_mutex> lk{mutex_};
+  log_window_.clear_logs();
+}
+
 void Gui::add_info(const std::string &info) {
   std::lock_guard<std::recursive_mutex> lk{mutex_};
   info_window_.add_log(info);

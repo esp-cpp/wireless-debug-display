@@ -24,15 +24,15 @@ menu "Wireless Debug Display Configuration"
 
     config ESP_WIFI_SSID
         string "WiFi SSID"
-        default "myssid"
+        default ""
         help
-            SSID (network name) for the camera streamer to connect to.
+            SSID (network name) for the wireless debug display to connect to.
 
     config ESP_WIFI_PASSWORD
         string "WiFi Password"
-        default "mypassword"
+        default ""
         help
-            WiFi password (WPA or WPA2) for the camera streamer to use.
+            WiFi password (WPA or WPA2) for the wireless debug display to use.
 
     config ESP_MAXIMUM_RETRY
         int "Maximum retry"

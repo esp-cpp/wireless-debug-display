@@ -52,6 +52,9 @@ public:
 
   void switch_tab();
 
+  void clear_plots();
+  void clear_logs();
+
   void push_data(const std::string &data);
   std::string pop_data();
 

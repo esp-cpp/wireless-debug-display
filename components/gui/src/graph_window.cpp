@@ -118,6 +118,8 @@ void GraphWindow::clear_plots(void) {
   while (lv_spangroup_get_child(legend_, 0)) {
     lv_spangroup_delete_span(legend_, lv_spangroup_get_child(legend_, 0));
   }
+  // invalidate
+  invalidate();
 }
 
 void GraphWindow::add_data(const std::string &plotName, int newData) {
