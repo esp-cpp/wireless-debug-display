@@ -14,12 +14,13 @@ dependencies:
   espp/esp-box:
     version: '>=1.0'
     rules:
-      - if: "target in [esp32s3]"
+    - if: target in [esp32s3]
   espp/t-deck:
     version: '>=1.0'
     rules:
-      - if: "target in [esp32s3]"
+    - if: target in [esp32s3]
   espp/wrover-kit:
     version: '>=1.0'
     rules:
-      - if: "target in [esp32]"
+    - if: target in [esp32]
+  espp/cli: '>=1.0'

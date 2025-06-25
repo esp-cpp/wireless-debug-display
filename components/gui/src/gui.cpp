@@ -60,6 +60,22 @@ std::string Gui::pop_data() {
 void Gui::clear_info() {
   std::lock_guard<std::recursive_mutex> lk{mutex_};
   info_window_.clear_logs();
+  // refresh the display
+  lv_obj_invalidate(tabview_);
+}
+
+void Gui::clear_plots() {
+  std::lock_guard<std::recursive_mutex> lk{mutex_};
+  plot_window_.clear_plots();
+  // refresh the display
+  lv_obj_invalidate(tabview_);
+}
+
+void Gui::clear_logs() {
+  std::lock_guard<std::recursive_mutex> lk{mutex_};
+  log_window_.clear_logs();
+  // refresh the display
+  lv_obj_invalidate(tabview_);
 }
 
 void Gui::add_info(const std::string &info) {
