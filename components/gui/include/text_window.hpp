@@ -14,6 +14,14 @@ public:
   void clear_logs(void);
   void add_log(const std::string &log_text);
 
+  lv_obj_t *get_lv_obj(void) { return log_container_; }
+
+  void invalidate() {
+    if (log_container_) {
+      lv_obj_invalidate(log_container_);
+    }
+  }
+
 private:
   std::string log_text_{""};
   lv_obj_t *log_container_{nullptr};

@@ -18,6 +18,14 @@ public:
   void add_data(const std::string &plot_name, int new_data);
   void remove_plot(const std::string &plot_name);
 
+  lv_obj_t *get_lv_obj(void) { return wrapper_; }
+
+  void invalidate() {
+    if (wrapper_) {
+      lv_obj_invalidate(wrapper_);
+    }
+  }
+
 protected:
   lv_chart_series_t *create_plot(const std::string &plotName);
   lv_chart_series_t *get_plot(const std::string &plotName);

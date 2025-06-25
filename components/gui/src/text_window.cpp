@@ -14,10 +14,12 @@ void TextWindow::init(lv_obj_t *parent, size_t width, size_t height) {
 }
 
 void TextWindow::clear_logs(void) {
-  // clear all the logs off the page
-  lv_obj_clean(log_container_);
+  // set the string to the display
+  lv_label_set_text(log_container_, "");
   // now empty the string
   log_text_.clear();
+  // invalidate
+  invalidate();
 }
 
 void TextWindow::add_log(const std::string &log_text) {
